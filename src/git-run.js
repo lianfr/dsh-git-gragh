@@ -1,0 +1,114 @@
+/**
+ * 唯一执行 git 的地方：argv 数组，绝不拼 shell 字符串。
+ *
+ * 输出用 Buffer 收集后再按 utf8 解码（提交信息和路径都可能是中文），
+ * 超过上限直接掐断，避免一个巨型 diff 把进程撑爆。
+ */
+
+import { spawn } from 'node:child_process'
+
+const DEFAULT_TIMEOUT_MS = 30_000
+const MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+
+export class GitError extends Error {
+  constructor(message, code = 'git-failed', status = 400) {
+    super(message)
+    this.name = 'GitError'
+    this.code = code
+    this.status = status
+  }
+}
+
+/** 执行 git 并等待结束；非零退出码会以 GitError 抛出，stderr 作为消息。 */
+export function runGit(cwd, args, options = {}) {
+  const timeoutMs = options.timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : options.timeoutMs
+  const wantsStdin = typeof options.input === 'string'
+  return new Promise((resolve, reject) => {
+    let child = null
+    try {
+      child = spawn('git', args, {
+        cwd,
+        env: Object.assign({}, process.env, {
+          GIT_TERMINAL_PROMPT: '0',
+          LC_ALL: 'C',
+          LANG: 'C',
+        }),
+        stdio: [wantsStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      })
+    } catch (error) {
+      reject(new GitError('无法启动 git：' + messageOf(error), 'spawn-failed', 500))
+      return
+    }
+
+    const chunks = []
+    const errors = []
+    let outBytes = 0
+    let settled = false
+    let timer = null
+
+    const finish = (handler, value) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) clearTimeout(timer)
+      handler(value)
+    }
+    const kill = () => {
+      try { child.kill('SIGKILL') } catch (error) { void error }
+    }
+
+    timer = setTimeout(() => {
+      kill()
+      finish(reject, new GitError('git ' + args[0] + ' 超时（' + timeoutMs + 'ms）', 'timeout', 504))
+    }, timeoutMs)
+
+    child.stdout.on('data', (chunk) => {
+      outBytes += chunk.length
+      if (outBytes > MAX_OUTPUT_BYTES) {
+        kill()
+        finish(reject, new GitError('git 输出超过上限（16 MiB），已中止', 'output-too-large', 413))
+        return
+      }
+      chunks.push(chunk)
+    })
+    child.stderr.on('data', (chunk) => { errors.push(chunk) })
+    child.on('error', (error) => {
+      finish(reject, new GitError('无法执行 git：' + messageOf(error), 'spawn-failed', 500))
+    })
+    child.on('close', (code) => {
+      const stdout = Buffer.concat(chunks).toString('utf8')
+      const stderr = Buffer.concat(errors).toString('utf8').trim()
+      /* --no-index 这类"有差异就算失败"的调用需要读出内容，退出码不算错。 */
+      if (code === 0 || options.allowNonZero === true) {
+        finish(resolve, { code, stdout, stderr })
+        return
+      }
+      finish(reject, new GitError(stderr === '' ? 'git ' + args[0] + ' 退出码 ' + code : stderr, 'git-exit', 400))
+    })
+
+    if (wantsStdin) {
+      child.stdin.on('error', (error) => { void error })
+      child.stdin.end(options.input, 'utf8')
+    }
+  })
+}
+
+export async function gitText(cwd, args, options) {
+  const result = await runGit(cwd, args, options)
+  return result.stdout
+}
+
+/** 执行 git，失败时返回 null 而不是抛出——用于"有更好，没有也行"的信息。 */
+export async function gitTextQuiet(cwd, args, options) {
+  try {
+    return await gitText(cwd, args, options)
+  } catch (error) {
+    void error
+    return null
+  }
+}
+
+export function messageOf(error) {
+  if (error === null || error === undefined) return 'unknown error'
+  if (typeof error === 'string') return error
+  return typeof error.message === 'string' ? error.message : String(error)
+}

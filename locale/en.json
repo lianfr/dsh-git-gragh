@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Git Workbench",
+    "description": "A sidebar Git workbench: a commit graph with a pinned main lane, plus commit details, changes and commit in one column."
+  }
+}

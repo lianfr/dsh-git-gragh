@@ -1,0 +1,62 @@
+{
+  "name": "dsh-git-workbench",
+  "version": "0.1.0",
+  "description": "DSH plugin: a Git workbench as a native dsh-better-sidebar tab — commit graph with a pinned main lane, plus changes and commit in one column. | DSH 插件：侧边栏 Git 工作台——主分支锁定列的提交图，变更与提交同栏。",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-modules",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "icon.svg",
+    "locale",
+    "src/index.js",
+    "src/git-run.js",
+    "src/git-parse.js",
+    "src/client.js",
+    "cordis.patch.yml",
+    "dsh.plugin.json",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "dsh-better-sidebar",
+    "git",
+    "commit-graph",
+    "source-control",
+    "sidebar"
+  ],
+  "license": "MIT",
+  "icon": "./icon.svg",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "dsh-better-sidebar": ">=0.12.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-better-sidebar": {
+      "optional": true
+    }
+  }
+}

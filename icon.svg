@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- A trunk that never drifts, one branch stepping off it. -->
+  <circle cx="7" cy="5" r="2.2" stroke="currentColor" stroke-width="1.6"/>
+  <circle cx="7" cy="19" r="2.2" stroke="currentColor" stroke-width="1.6"/>
+  <circle cx="17" cy="9" r="2.2" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M7 7.2v9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M7 12.6c0-2.7 3.4-3.6 7.8-3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

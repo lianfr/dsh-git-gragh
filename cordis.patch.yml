@@ -1,0 +1,10 @@
+# dsh-git-workbench bundle patch.
+#
+# Installed through the plugin manager (or `dsh plugin add <path>`), the command
+# reconciles dsh.profile.bundles against installed packages and merges THIS
+# patch. Only the Node half loads through this row — the /dsh-git-workbench/api
+# routes. The web client half is served through exports["./client"] and mounted
+# by the browser boot graph, where it registers one dsh-better-sidebar tab.
+- insert:
+    - id: git-workbench
+      name: 'dsh-git-workbench'
