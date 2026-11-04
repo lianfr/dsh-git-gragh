@@ -103,6 +103,7 @@ window.__ModuleLoader__.load({
   border:1px solid var(--dsw-alias-border-l2);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
 .gw-ref-flag { width:4px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.55; }
 .gw-ref-label { display:flex; align-items:center; min-width:0; padding:0 5px 0 4px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:10px; font-weight:500; color:var(--dsw-alias-label-secondary); }
