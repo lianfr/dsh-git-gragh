@@ -142,8 +142,8 @@ window.__ModuleLoader__.load({
   border:1px solid var(--dsw-alias-border-l2); border-left:none; border-right:none;
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:10px; line-height:13px; color:var(--dsw-alias-label-secondary); }
-/* 旗子右侧那条分隔不满高，上下各留三像素，弱化成一处分隔暗示。 */
-.gw-ref-kind::after { content:''; position:absolute; right:0; top:3px; bottom:3px; width:1px;
+/* 旗子右侧那条分隔不满高，上下各留两像素，弱化成一处分隔暗示。 */
+.gw-ref-kind::after { content:''; position:absolute; right:0; top:2px; bottom:2px; width:1px;
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 20%, transparent); }
 .gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
   border:1px solid var(--dsw-alias-border-l2); border-left:none;
