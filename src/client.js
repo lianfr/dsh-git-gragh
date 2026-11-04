@@ -26,7 +26,7 @@ window.__ModuleLoader__.load({
 
 .gw-textarea { width:100%; box-sizing:border-box; min-height:54px; max-height:160px; resize:vertical;
   font:inherit; color:var(--dsw-alias-label-primary); background:var(--dsw-alias-bg-layer-1);
-  border:1px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-sm); padding:6px 8px; outline:none; }
+  border:1px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-lg); padding:6px 10px; outline:none; }
 .gw-textarea:focus { border-color:var(--dsw-alias-brand-primary); }
 .gw-textarea::placeholder { color:var(--dsw-alias-label-tertiary); }
 
@@ -77,8 +77,7 @@ window.__ModuleLoader__.load({
 .gw-behind { color:var(--dsw-alias-state-warn-primary); }
 .gw-spacer { flex:1 1 auto; }
 
-.gw-graph-body { flex:1 1 auto; min-height:0; overflow:auto; position:relative;
-  background:var(--dsw-alias-bg-layer-1); }
+.gw-graph-body { flex:1 1 auto; min-height:0; overflow:auto; position:relative; }
 .gw-canvas { position:relative; }
 .gw-row { position:absolute; left:0; right:0; display:flex; align-items:center; gap:6px;
   cursor:pointer; user-select:none; }
@@ -88,7 +87,8 @@ window.__ModuleLoader__.load({
 .gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px;
   font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace); }
 
-.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
+.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 6px;
+  border-radius:var(--dsw-radius-sm);
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
 .gw-ref-branch { background:color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
   color:var(--dsw-alias-brand-primary); }
@@ -97,9 +97,7 @@ window.__ModuleLoader__.load({
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
-.gw-drawer { position:absolute; right:6px; background-color:var(--dsw-alias-bg-layer-1);
-  background-image:linear-gradient(var(--dsw-alias-interactive-bg-hover),
-    var(--dsw-alias-interactive-bg-hover));
+.gw-drawer { position:absolute; right:6px; background:var(--dsw-alias-bg-layer-1);
   border-radius:var(--dsw-radius-md);
   border-top:1px solid var(--dsw-alias-border-l1); border-bottom:1px solid var(--dsw-alias-border-l1);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
