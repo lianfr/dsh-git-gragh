@@ -442,9 +442,31 @@ window.__ModuleLoader__.load({
 
       const rest = []
       for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
+      // stash 自己占一条道，不能被并进它所属的分支里看着像分支的一部分。
       rest.sort((a, b) => chains[a].first - chains[b].first)
       const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
       for (const index of order) takeLane(index)
+
+      // stash 是挂在某条分支上的快照，不算分支本身：它单独占一列，
+      // 插在它父提交所在列的紧右边，其余列整体右移让位，
+      // 这样既不会被并进分支，也不至于孤零零甩到最右边。
+      for (let index = 0; index < chains.length; index++) {
+        const headRefs = Array.isArray(entries[chains[index].first].refs) ? entries[chains[index].first].refs : []
+        let stashed = false
+        for (let r = 0; r < headRefs.length; r++) if (headRefs[r] && headRefs[r].type === 'stash') { stashed = true; break }
+        if (!stashed) continue
+        const stashParents = Array.isArray(entries[chains[index].first].parents) ? entries[chains[index].first].parents : []
+        const baseRow = stashParents.length > 0 ? rowOfHash.get(stashParents[0]) : undefined
+        const baseChain = baseRow === undefined ? -1 : chainOf[baseRow]
+        if (baseChain < 0 || baseChain === index) continue
+        const at = chains[baseChain].lane
+        if (chains[index].lane === at) continue
+        for (let other = 0; other < chains.length; other++) {
+          if (other !== index && chains[other].lane >= at) chains[other].lane += 1
+        }
+        chains[index].lane = at
+      }
+      for (let i = 0; i < chains.length; i++) chains[i].color = chains[i].lane
 
       const rowLane = new Array(entries.length).fill(0)
       const rowColor = new Array(entries.length).fill(0)
@@ -452,20 +474,6 @@ window.__ModuleLoader__.load({
         const chain = chains[chainOf[i]]
         rowLane[i] = chain.lane
         rowColor[i] = chain.color
-      }
-
-      // stash 只是暂存区快照，跟着它所在的那条分支走，不单独占道
-      for (let i = 0; i < entries.length; i++) {
-        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
-        let stashed = false
-        for (let r = 0; r < refs.length; r++) if (refs[r] && refs[r].type === 'stash') { stashed = true; break }
-        if (!stashed) continue
-        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
-        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
-        if (row !== undefined) {
-          rowLane[i] = rowLane[row]
-          rowColor[i] = rowColor[row]
-        }
       }
 
       // 未提交的改动跟它所属的分支同列同色，不单独占道
