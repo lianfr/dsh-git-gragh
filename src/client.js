@@ -3,11 +3,13 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     const React = require('react')
     const E = React.createElement
-    const { useState, useEffect, useRef, useCallback, useMemo } = React
+    const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } = React
 
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
+    const UNCOMMITTED_HASH = '@uncommitted'
+  const POLL_MS = 3000
     const ROW_H = 24
     const LANE_W = 14
     const DRAWER_H = 300
@@ -26,7 +28,9 @@ window.__ModuleLoader__.load({
 
 .gw-textarea { width:100%; box-sizing:border-box; min-height:54px; max-height:160px; resize:vertical;
   font:inherit; color:var(--dsw-alias-label-primary); background:var(--dsw-alias-bg-layer-1);
-  border:1px solid var(--dsw-alias-border-l2); border-radius:6px; padding:6px 8px; outline:none; }
+  border:1px solid var(--dsw-alias-border-l2); border-radius:16px;
+  border-radius:var(--dsw-radius-lg); padding:6px 10px;
+  outline:none; }
 .gw-textarea:focus { border-color:var(--dsw-alias-brand-primary); }
 .gw-textarea::placeholder { color:var(--dsw-alias-label-tertiary); }
 
@@ -80,13 +84,18 @@ window.__ModuleLoader__.load({
 .gw-graph-body { flex:1 1 auto; min-height:0; overflow:auto; position:relative; }
 .gw-canvas { position:relative; }
 .gw-row { position:absolute; left:0; right:0; display:flex; align-items:center; gap:6px;
-  cursor:pointer; user-select:none; }
-.gw-row:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-row-sel { background:var(--dsw-alias-interactive-bg-active); }
+  padding-right:8px; cursor:pointer; user-select:none; }
+.gw-row:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
+.gw-row-sel, .gw-row-sel:hover { background:var(--dsw-alias-interactive-bg-active);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
-.gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px; }
-.gw-row-hash { color:var(--dsw-alias-label-tertiary); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:10.5px; flex:none; }
+.gw-row-ghost { cursor: default; }
+    .gw-row-ghost .gw-row-subject { color: var(--dsw-alias-label-secondary); }
+    .gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
+  color:var(--dsw-alias-label-tertiary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-row-sep { opacity:.5; }
 
 .gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
@@ -97,9 +106,14 @@ window.__ModuleLoader__.load({
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
-.gw-drawer { position:absolute; left:0; right:0; background:var(--dsw-alias-bg-layer-1);
-  border-top:1px solid var(--dsw-alias-border-l2); border-bottom:1px solid var(--dsw-alias-border-l2);
+.gw-drawer { position:absolute; left:0; right:0; z-index:1;
+  background:var(--dsw-alias-bg-layer-1);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 1.5%, var(--dsw-alias-bg-layer-1));
+  border-bottom:1px solid var(--dsw-alias-border-l2);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
+.gw-drawer-divider { position:absolute; top:8px; bottom:8px; width:0;
+  border-left:1px solid var(--dsw-alias-border-l1);
+  pointer-events:none; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
 .gw-detail-msg { white-space:pre-wrap; font-size:12px; margin:0 0 8px; color:var(--dsw-alias-label-primary); }
 .gw-kv { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:11.5px; margin-bottom:8px; }
@@ -174,6 +188,7 @@ window.__ModuleLoader__.load({
         discardConfirm: '确定丢弃对 {path} 的更改？此操作无法撤销。',
         discardAllConfirm: '确定丢弃全部未暂存更改？此操作无法撤销。',
         noChanges: '工作区干净',
+        uncommitted: '未提交的更改',
         noCommits: '还没有提交',
         noRepo: '当前工作目录不是 Git 仓库',
         loading: '加载中…',
@@ -211,6 +226,7 @@ window.__ModuleLoader__.load({
         discardConfirm: 'Discard changes in {path}? This cannot be undone.',
         discardAllConfirm: 'Discard all unstaged changes? This cannot be undone.',
         noChanges: 'Working tree clean',
+        uncommitted: 'Uncommitted changes',
         noCommits: 'No commits yet',
         noRepo: 'Current directory is not a Git repository',
         loading: 'Loading…',
@@ -314,6 +330,17 @@ window.__ModuleLoader__.load({
       return null
     }
 
+    function signatureOf(view) {
+      if (view === null) return ''
+      const counts = view.counts || {}
+      const list = Array.isArray(view.changes) ? view.changes : []
+      return [
+        view.branch, view.head, view.ahead, view.behind,
+        counts.staged, counts.unstaged, counts.untracked, counts.conflicted,
+        list.map((item) => item.path + item.index + item.worktree).join('\u0001'),
+      ].join('\u0000')
+    }
+
     function computeLayout(entries) {
       if (entries.length === 0) return { rowLane: [], laneCount: 1, edges: [], rowOfHash: new Map() }
 
@@ -371,6 +398,16 @@ window.__ModuleLoader__.load({
         rowLane[i] = lane
         if (lane + 1 > laneCount) laneCount = lane + 1
       }
+
+      // 未提交的改动跟它所属的分支同列，不单独占一条泳道
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i].uncommitted !== true) continue
+        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
+        if (row !== undefined) rowLane[i] = rowLane[row]
+      }
+      laneCount = 1
+      for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
 
       const edges = []
       for (let i = 0; i < entries.length; i++) {
@@ -551,6 +588,14 @@ window.__ModuleLoader__.load({
       const y = props.y
       const t = props.t
       const refs = Array.isArray(entry.refs) ? entry.refs : []
+      if (entry.uncommitted === true) {
+        return E('div', {
+          className: 'gw-row gw-row-ghost',
+          style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
+          title: entry.subject,
+        },
+          E('span', { className: 'gw-row-subject' }, entry.subject))
+      }
       return E('div', {
         className: 'gw-row' + (props.selected ? ' gw-row-sel' : ''),
         style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
@@ -558,10 +603,14 @@ window.__ModuleLoader__.load({
         onContextMenu: props.onContextMenu,
         title: entry.subject,
       },
-        E('span', { className: 'gw-row-hash' }, entry.short),
         refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
-        E('span', { className: 'gw-row-meta' }, entry.author + ' · ' + relativeTime(entry.time, t)))
+        E('span', { className: 'gw-row-meta' },
+          E('span', null, entry.author),
+          E('span', { className: 'gw-row-sep' }, '·'),
+          E('span', null, relativeTime(entry.time, t)),
+          E('span', { className: 'gw-row-sep' }, '·'),
+          E('span', null, entry.short)))
     }
 
     function DiffPane(props) {
@@ -594,7 +643,14 @@ window.__ModuleLoader__.load({
         style: { top: props.top + 'px', height: props.height + 'px' },
         onClick: (event) => event.stopPropagation(),
       },
-        E('div', { className: 'gw-drawer-scroll' },
+        E('div', {
+          className: 'gw-drawer-divider',
+          style: { left: String(props.indent) + 'px' },
+        }),
+        E('div', {
+          className: 'gw-drawer-scroll',
+          style: { paddingLeft: String(props.indent + 12) + 'px' },
+        },
           detail === null || detail === undefined
             ? E('div', { className: 'gw-empty' }, t('loading'))
             : E('div', null,
@@ -703,6 +759,12 @@ window.__ModuleLoader__.load({
       const [openGroups, setOpenGroups] = useState({ conflicts: true, staged: true, changes: true, untracked: true })
 
       const aliveRef = useRef(true)
+      const lastSigRef = useRef(null)
+      const bodyRef = useRef(null)
+      // 刷新会替换整个历史列表，先把用户正在看的那一行记下来，落库后再对回去
+      const pendingAnchorRef = useRef(null)
+      const entriesRef = useRef([])
+      const offsetsRef = useRef({ list: [], total: 0 })
       useEffect(() => {
         aliveRef.current = true
         return () => { aliveRef.current = false }
@@ -712,7 +774,10 @@ window.__ModuleLoader__.load({
         if (cwd === '') return null
         try {
           const data = await api('summary', { cwd: cwd })
-          if (aliveRef.current) { setSummary(data); setError(null) }
+          if (aliveRef.current) {
+            setSummary(data)
+            setError(null)
+          }
           return data
         } catch (failure) {
           if (aliveRef.current) setError(failure.message)
@@ -720,11 +785,27 @@ window.__ModuleLoader__.load({
         }
       }, [cwd])
 
+      const captureAnchor = () => {
+        const node = bodyRef.current
+        if (node === null || node.scrollTop <= 0) return null
+        const top = node.scrollTop
+        const list = offsetsRef.current.list
+        const items = entriesRef.current
+        for (let i = 0; i < items.length; i++) {
+          if (list[i] + ROW_H > top) return { hash: items[i].hash, delta: top - list[i] }
+        }
+        return null
+      }
+
       const refreshLog = useCallback(async () => {
         if (cwd === '') return
         try {
-          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: 0 })
+          // 已经往下翻过的部分要一起取回来，否则刷新会把列表截回第一页
+          const limit = Math.max(PAGE_SIZE, entriesRef.current.length)
+          const anchor = captureAnchor()
+          const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
+          pendingAnchorRef.current = anchor
           setEntries(Array.isArray(data.entries) ? data.entries : [])
           setHasMore(data.hasMore === true)
           setError(null)
@@ -734,8 +815,8 @@ window.__ModuleLoader__.load({
       }, [cwd])
 
       const refreshAll = useCallback(async () => {
-        await refreshSummary()
-        await refreshLog()
+        const [view] = await Promise.all([refreshSummary(), refreshLog()])
+        lastSigRef.current = signatureOf(view)
       }, [refreshSummary, refreshLog])
 
       // 只在切换仓库时清空视图；可见性变化只负责重新拉取，避免同一次挂载发起两轮请求。
@@ -751,6 +832,22 @@ window.__ModuleLoader__.load({
         if (props.visible === false) return
         void refreshAll()
       }, [cwd, props.visible, refreshAll])
+
+      // 外部操作（终端、编辑器、其他 agent）不会通知面板，靠轮询 summary 的签名变化触发重拉。
+      useEffect(() => {
+        if (props.visible === false || cwd === '') return undefined
+        let stopped = false
+        const timer = setInterval(async () => {
+          if (stopped) return
+          const view = await refreshSummary()
+          if (stopped || view === null) return
+          const signature = signatureOf(view)
+          if (signature === lastSigRef.current) return
+          lastSigRef.current = signature
+          await refreshLog()
+        }, POLL_MS)
+        return () => { stopped = true; clearInterval(timer) }
+      }, [cwd, props.visible, refreshSummary, refreshLog])
 
       const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore || cwd === '') return
@@ -886,28 +983,68 @@ window.__ModuleLoader__.load({
       const unstaged = changes.filter((item) => item.conflicted !== true && item.staged !== true && item.untracked !== true)
       const untracked = changes.filter((item) => item.untracked === true)
 
-      const layout = useMemo(() => computeLayout(entries), [entries])
+      // 未提交的改动单独占一行，形状与提交一致，但不指向任何对象
+      const changeTotal = conflicted.length + staged.length + unstaged.length + untracked.length
+      const headHash = summary === null || summary.head === undefined ? null : summary.head
+      const rowEntries = useMemo(() => {
+        if (changeTotal === 0) return entries
+        return [{
+          hash: UNCOMMITTED_HASH,
+          short: '',
+          parents: headHash === null ? [] : [headHash],
+          author: '',
+          time: 0,
+          refs: [],
+          subject: t('uncommitted') + ' (' + String(changeTotal) + ')',
+          uncommitted: true,
+        }].concat(entries)
+      }, [entries, changeTotal, headHash, t])
+
+      const layout = useMemo(() => computeLayout(rowEntries), [rowEntries])
       const laneWidth = Math.max(24, layout.laneCount * LANE_W + 16)
 
       const offsets = useMemo(() => {
         const list = []
         let y = 0
-        for (let i = 0; i < entries.length; i++) {
+        for (let i = 0; i < rowEntries.length; i++) {
           list.push(y)
           y += ROW_H
-          if (selected !== null && entries[i].hash === selected) y += DRAWER_H
+          if (selected !== null && rowEntries[i].hash === selected) y += DRAWER_H
         }
         return { list: list, total: y }
-      }, [entries, selected])
+      }, [rowEntries, selected])
+
+      entriesRef.current = rowEntries
+      offsetsRef.current = offsets
+
+      // 列表替换后把锚点那一行对回原来的滚动位置；用户停在顶部时不干预
+      useLayoutEffect(() => {
+        const anchor = pendingAnchorRef.current
+        if (anchor === null) return
+        pendingAnchorRef.current = null
+        const node = bodyRef.current
+        if (node === null) return
+        const index = rowEntries.findIndex((item) => item.hash === anchor.hash)
+        if (index < 0) return
+        node.scrollTop = offsets.list[index] + anchor.delta
+      }, [rowEntries, offsets])
 
       const svgHeight = offsets.total
+      // 抽屉展开的那一行在列表里的下标，用于判断某条连线是否跨过抽屉区间
+      const selectedIndex = useMemo(() => {
+        if (selected === null) return -1
+        for (let i = 0; i < rowEntries.length; i++) {
+          if (rowEntries[i].hash === selected) return i
+        }
+        return -1
+      }, [selected, rowEntries])
       const drawerTop = useMemo(() => {
         if (selected === null) return 0
-        for (let i = 0; i < entries.length; i++) {
-          if (entries[i].hash === selected) return offsets.list[i] + ROW_H
+        for (let i = 0; i < rowEntries.length; i++) {
+          if (rowEntries[i].hash === selected) return offsets.list[i] + ROW_H
         }
         return 0
-      }, [selected, entries, offsets])
+      }, [selected, rowEntries, offsets])
 
       const toggleGroup = useCallback((key) => {
         setOpenGroups((prev) => {
@@ -1024,24 +1161,34 @@ window.__ModuleLoader__.load({
             loading: diffView.loading === true,
             onBack: () => setDiffView(null),
           })
-        : E('div', { className: 'gw-graph-body', onScroll: onScroll },
-            entries.length === 0
+        : E('div', { className: 'gw-graph-body', onScroll: onScroll, ref: bodyRef },
+            rowEntries.length === 0
               ? E('div', { className: 'gw-empty' }, summary !== null && summary.empty === true ? t('noCommits') : t('noCommits'))
               : E('div', { className: 'gw-canvas', style: { height: svgHeight + 'px' } },
                   E('svg', {
                     width: '100%',
                     height: svgHeight,
-                    style: { position: 'absolute', left: 0, top: 0, pointerEvents: 'none' },
+                    style: { position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'none' },
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
                       const y2 = offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
-                      const mid = (y1 + y2) / 2
-                      const d = Math.abs(x1 - x2) < 0.5
-                        ? 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2
-                        : 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                      let d
+                      if (Math.abs(x1 - x2) < 0.5) {
+                        d = 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2
+                      } else if (selectedIndex >= 0 && edge.from <= selectedIndex && edge.to > selectedIndex) {
+                        // 跨抽屉的边：抽屉区间内保持竖直，换道收在抽屉下沿之后完成，
+                        // 避免长距离缓坡斜穿整个详情块
+                        const bottom = drawerTop + DRAWER_H
+                        const mid = (bottom + y2) / 2
+                        d = 'M' + x1 + ',' + y1 + ' L' + x1 + ',' + bottom
+                          + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                      } else {
+                        const mid = (y1 + y2) / 2
+                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                      }
                       return E('path', {
                         key: 'e' + String(index),
                         d: d,
@@ -1051,24 +1198,29 @@ window.__ModuleLoader__.load({
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
                     }),
-                    entries.map((entry, index) => E('circle', {
-                      key: 'c' + String(index),
-                      cx: layout.rowLane[index] * LANE_W + 12,
-                      cy: offsets.list[index] + ROW_H / 2,
-                      r: 3.4,
-                      fill: laneColor(layout.rowLane[index]),
-                      stroke: 'var(--dsw-alias-bg-layer-1)',
-                      strokeWidth: 1.2,
-                    }))),
-                  entries.map((entry, index) => E(GraphRow, {
+                    rowEntries.map((entry, index) => {
+                      const hollow = entry.uncommitted === true || (headHash !== null && entry.hash === headHash)
+                      return E('circle', {
+                        key: 'c' + String(index),
+                        cx: layout.rowLane[index] * LANE_W + 12,
+                        cy: offsets.list[index] + ROW_H / 2,
+                        r: hollow ? 3.6 : 3.4,
+                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowLane[index]),
+                        stroke: hollow === false
+                          ? 'var(--dsw-alias-bg-layer-1)'
+                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowLane[index])),
+                        strokeWidth: hollow ? 1.6 : 1.2,
+                      })
+                    })),
+                  rowEntries.map((entry, index) => E(GraphRow, {
                     key: entry.hash,
                     entry: entry,
                     y: offsets.list[index],
                     laneWidth: laneWidth,
                     t: t,
                     selected: selected === entry.hash,
-                    onClick: () => { void selectCommit(entry) },
-                    onContextMenu: (event) => {
+                    onClick: entry.uncommitted === true ? null : () => { void selectCommit(entry) },
+                    onContextMenu: entry.uncommitted === true ? null : (event) => {
                       event.preventDefault()
                       setMenu({ x: event.clientX, y: event.clientY, entry: entry })
                     },
@@ -1079,6 +1231,7 @@ window.__ModuleLoader__.load({
                         t: t,
                         detail: detail,
                         top: drawerTop,
+                        indent: laneWidth,
                         height: DRAWER_H,
                         onOpenFile: openCommitDiff,
                       })))
