@@ -1747,9 +1747,27 @@ window.__ModuleLoader__.load({
         const edges = []
         for (const edge of graphEdges) {
           const from = indexOf.get(edge.fromHash)
+          if (from === undefined) continue
+          /* 父提交还没加载到时，线一直画到画布底部，读者看得出这条链还在继续。 */
+          if (edge.dangling === true) {
+            edges.push({
+              from: from, to: rowEntries.length, dangling: true,
+              fromLane: edge.fromLane, toLane: edge.toLane,
+              fromColor: edge.fromColor, toColor: edge.toColor,
+              primary: edge.primary === true,
+            })
+            continue
+          }
           const to = indexOf.get(edge.toHash)
-          if (from === undefined || to === undefined) continue
+          if (to === undefined) continue
           edges.push({ from: from, to: to, fromLane: edge.fromLane, toLane: edge.toLane, fromColor: edge.fromColor, toColor: edge.toColor, primary: edge.primary === true })
+        }
+        /* 未提交那一行是前端插进来的，后端不知道它，这条灰线得自己补。 */
+        if (rowEntries.length > 1 && rowEntries[0].uncommitted === true) {
+          edges.push({
+            from: 0, to: 1, fromLane: rowLane[0], toLane: rowLane[1],
+            fromColor: rowColor[0], toColor: rowColor[1], primary: true,
+          })
         }
         return { rowLane: rowLane, rowColor: rowColor, edges: edges, laneCount: Math.max(1, laneCount) }
       }, [rowEntries, graphEdges, laneCount])
@@ -2132,7 +2150,9 @@ window.__ModuleLoader__.load({
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
-                      const y2 = offsets.list[edge.to] + ROW_H / 2
+                      const y2 = edge.dangling === true
+                        ? offsets.total
+                        : offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
                       let d

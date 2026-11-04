@@ -225,12 +225,24 @@ async function graph(payload) {
     }))
   }
 
-  /* 只回传落在窗口内的连线，下标换算成相对窗口的位置。 */
+  /* 只回传落在窗口内的连线，下标换算成相对窗口的位置。
+   * 父提交在窗口之外时照样回传，标成 dangling：前端据此画一条延伸到画布底部的
+   * 竖线，读者能看出这条链还没结束，而不是以为线断了。 */
   const edges = []
   for (const edge of layout.edges) {
     if (edge.from < skip || edge.from >= end) continue
     const to = edge.to - skip
-    if (to < 0 || to >= entries.length) continue
+    if (to < 0) continue
+    if (to >= entries.length) {
+      edges.push(Object.assign({}, edge, {
+        from: edge.from - skip,
+        to: entries.length,
+        fromHash: all[edge.from].hash,
+        toHash: null,
+        dangling: true,
+      }))
+      continue
+    }
     edges.push(Object.assign({}, edge, {
       from: edge.from - skip,
       to: to,
