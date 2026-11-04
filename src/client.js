@@ -109,7 +109,6 @@ window.__ModuleLoader__.load({
   font-size:10px; font-weight:500; color:var(--dsw-alias-label-secondary); }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
 .gw-ref-remote .gw-ref-label { font-style:italic; }
-.gw-ref-stash .gw-ref-label { color:var(--dsw-alias-state-success-primary); }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
   background:var(--dsw-alias-bg-layer-1);
