@@ -233,7 +233,9 @@ async function graph(payload) {
     if (edge.from < skip || edge.from >= end) continue
     const to = edge.to - skip
     if (to < 0) continue
-    if (to >= entries.length) {
+    /* 只让第一父悬空：第二父找不到时画一条到底部的线会误导读者以为那是主线，
+     * Git Graph 也是只对第一父接虚拟顶点。 */
+    if (to >= entries.length && edge.primary === true) {
       edges.push(Object.assign({}, edge, {
         from: edge.from - skip,
         to: entries.length,
