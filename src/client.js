@@ -117,6 +117,9 @@ window.__ModuleLoader__.load({
 .gw-ref-tag .gw-ref-label, .gw-ref-stash .gw-ref-label,
 .gw-ref-tag .gw-ref-kind, .gw-ref-stash .gw-ref-kind,
 .gw-ref-tag .gw-ref-remotes, .gw-ref-stash .gw-ref-remotes { border-color:var(--gw-ref-edge); }
+/* 旗帜格右侧那条分隔比外框淡一档，别把名字切成两半。 */
+.gw-ref-tag .gw-ref-kind, .gw-ref-stash .gw-ref-kind {
+  border-right-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 20%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0; overflow:hidden;
   box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
   border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
@@ -139,6 +142,7 @@ window.__ModuleLoader__.load({
 .gw-ref-kind { display:flex; align-items:center; justify-content:center; flex:none;
   padding:0 3px; box-sizing:border-box;
   border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:10px; line-height:13px; color:var(--dsw-alias-label-secondary); }
 .gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
   border:1px solid var(--dsw-alias-border-l2); border-left:none;
