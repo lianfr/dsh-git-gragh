@@ -66,12 +66,13 @@ window.__ModuleLoader__.load({
   margin-left:13px; padding-left:4px; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
 .gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
-.gw-mark { flex:none; width:12px; text-align:center; font-size:10px; font-weight:600;
-  font-family:var(--ds-font-family-code, ui-monospace, monospace); }
-.gw-mark-mod { color:var(--dsw-alias-state-warn-primary); }
-.gw-mark-new { color:var(--dsw-alias-state-success-primary); }
-.gw-mark-del { color:var(--dsw-alias-state-error-primary); }
-.gw-mark-conflict { color:var(--dsw-alias-state-error-primary); }
+.gw-file.gw-tone-new .gw-file-name { color:var(--dsw-alias-state-success-primary); }
+.gw-file.gw-tone-new .gw-file-icon { color:var(--dsw-alias-state-success-primary); }
+.gw-file.gw-tone-mod .gw-file-name { color:var(--dsw-alias-state-warn-primary); }
+.gw-file.gw-tone-mod .gw-file-icon { color:var(--dsw-alias-state-warn-primary); }
+.gw-file.gw-tone-danger .gw-file-name { color:var(--dsw-alias-state-error-primary); }
+.gw-file.gw-tone-danger .gw-file-icon { color:var(--dsw-alias-state-error-primary); }
+.gw-file.gw-tone-danger .gw-file-name { text-decoration:line-through; }
 .gw-tree-dir { cursor:pointer; color:var(--dsw-alias-label-secondary); }
 .gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:11.5px; }
@@ -1109,14 +1110,19 @@ window.__ModuleLoader__.load({
       let idxCode = item.index
       let workCode = item.worktree
       if (untracked) { idxCode = '?' }
-      let mark = 'M'
-      let markClass = 'gw-mark-mod'
-      if (conflicted) { mark = '!'; markClass = 'gw-mark-conflict' }
-      else if (untracked) { mark = 'U'; markClass = 'gw-mark-new' }
-      else if (workCode === 'D' || idxCode === 'D') { mark = 'D'; markClass = 'gw-mark-del' }
-      else if (staged) { mark = idxCode === 'A' ? 'A' : 'M'; markClass = 'gw-mark-new' }
+      /* 不用状态字母，靠分区（分组）+ 颜色表达：待提交与新文件偏绿、改动偏黄、删除与冲突偏红。 */
+      let tone = 'gw-tone-mod'
+      if (conflicted) tone = 'gw-tone-danger'
+      else if (workCode === 'D' || idxCode === 'D') tone = 'gw-tone-danger'
+      else if (props.group === 'staged') tone = 'gw-tone-new'
+      else if (props.group === 'untracked') tone = 'gw-tone-new'
+      else if (props.group === 'unstaged') tone = 'gw-tone-mod'
 
-      return E('div', { className: 'gw-file', onClick: () => props.onOpen(item), title: item.path },
+      return E('div', {
+        className: 'gw-file ' + tone,
+        onClick: () => props.onOpen(item),
+        title: item.path,
+      },
         E('svg', {
           className: 'gw-file-icon', width: 13, height: 13, viewBox: '0 0 16 16',
           fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
@@ -1127,7 +1133,7 @@ window.__ModuleLoader__.load({
         E('span', { className: 'gw-file-name' },
           parts.dir === '' ? null : E('span', { className: 'gw-file-dir' }, parts.dir),
           parts.name),
-        E('span', { className: 'gw-mark ' + markClass }, mark),
+
         E('span', { className: 'gw-file-actions' },
           untracked || !staged
             ? E('button', {
@@ -1256,6 +1262,7 @@ window.__ModuleLoader__.load({
           : items.map((item, index) => E(FileRow, {
               key: item.path + ':' + String(index),
               item: item,
+              group: props.group,
               t: t,
               onOpen: props.onOpen,
               onStage: props.onStage,
@@ -1817,7 +1824,7 @@ window.__ModuleLoader__.load({
       const changes = summary !== null && Array.isArray(summary.changes) ? summary.changes : []
       const conflicted = changes.filter((item) => item.conflicted === true)
       const staged = changes.filter((item) => item.conflicted !== true && item.staged === true)
-      const unstaged = changes.filter((item) => item.conflicted !== true && item.staged !== true && item.untracked !== true)
+      const unstaged = changes.filter((item) => item.conflicted !== true && item.unstaged === true)
       const untracked = changes.filter((item) => item.untracked === true)
 
       // 未提交的改动单独占一行，形状与提交一致，但不指向任何对象
@@ -2125,13 +2132,13 @@ window.__ModuleLoader__.load({
               ? null
               : E('div', null,
                   E(ChangeGroup, {
-                    title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
+                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('conflicts'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
                   }),
                   E(ChangeGroup, {
-                    title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
+                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('staged'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
@@ -2141,7 +2148,7 @@ window.__ModuleLoader__.load({
                     }, t('unstageAll')),
                   }),
                   E(ChangeGroup, {
-                    title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
+                    group: 'unstaged', title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('changes'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
@@ -2151,7 +2158,7 @@ window.__ModuleLoader__.load({
                     }, t('stageAll')),
                   }),
                   E(ChangeGroup, {
-                    title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
+                    group: 'untracked', title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('untracked'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
