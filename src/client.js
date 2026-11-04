@@ -461,8 +461,15 @@ window.__ModuleLoader__.load({
         if (baseChain < 0 || baseChain === index) continue
         const at = chains[baseChain].lane + 1
         if (chains[index].lane === at) continue
+        // 只让真正与 stash 所在行冲突的链让位，
+        // 行区间不重叠的照旧共用一列，别平白多出一条空道。
+        const stashFirst = chains[index].first
+        const stashLast = chains[index].last
         for (let other = 0; other < chains.length; other++) {
-          if (other !== index && chains[other].lane >= at) chains[other].lane += 1
+          if (other === index) continue
+          if (chains[other].lane < at) continue
+          if (chains[other].last < stashFirst || chains[other].first > stashLast) continue
+          chains[other].lane += 1
         }
         chains[index].lane = at
       }
