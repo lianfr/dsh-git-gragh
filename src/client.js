@@ -102,12 +102,11 @@ window.__ModuleLoader__.load({
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
-.gw-drawer { position:absolute; right:0; background:var(--dsw-alias-bg-layer-1);
+.gw-drawer { position:absolute; left:0; right:0; z-index:1;
+  background:var(--dsw-alias-bg-layer-1);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-layer-1));
-  border-left:1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  border-bottom:1px solid var(--dsw-alias-border-l2);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
-.gw-drawer-rule { position:absolute; left:0; right:0; border-top:1px solid var(--dsw-alias-border-l2);
-  pointer-events:none; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
 .gw-detail-msg { white-space:pre-wrap; font-size:12px; margin:0 0 8px; color:var(--dsw-alias-label-primary); }
 .gw-kv { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:11.5px; margin-bottom:8px; }
@@ -614,10 +613,13 @@ window.__ModuleLoader__.load({
       const detail = props.detail
       return E('div', {
         className: 'gw-drawer',
-        style: { top: props.top + 'px', height: props.height + 'px', left: props.left + 'px' },
+        style: { top: props.top + 'px', height: props.height + 'px' },
         onClick: (event) => event.stopPropagation(),
       },
-        E('div', { className: 'gw-drawer-scroll' },
+        E('div', {
+          className: 'gw-drawer-scroll',
+          style: { paddingLeft: String(props.indent + 12) + 'px' },
+        },
           detail === null || detail === undefined
             ? E('div', { className: 'gw-empty' }, t('loading'))
             : E('div', null,
@@ -1082,7 +1084,7 @@ window.__ModuleLoader__.load({
                   E('svg', {
                     width: '100%',
                     height: svgHeight,
-                    style: { position: 'absolute', left: 0, top: 0, pointerEvents: 'none' },
+                    style: { position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'none' },
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
@@ -1136,19 +1138,14 @@ window.__ModuleLoader__.load({
                   })),
                   selected === null
                     ? null
-                    : E('div', { key: 'drawer' },
-                        E(CommitDrawer, {
-                          t: t,
-                          detail: detail,
-                          top: drawerTop,
-                          left: laneWidth,
-                          height: DRAWER_H,
-                          onOpenFile: openCommitDiff,
-                        }),
-                        E('div', {
-                          className: 'gw-drawer-rule',
-                          style: { top: (drawerTop + DRAWER_H) + 'px' },
-                        }))))
+                    : E(CommitDrawer, {
+                        t: t,
+                        detail: detail,
+                        top: drawerTop,
+                        indent: laneWidth,
+                        height: DRAWER_H,
+                        onOpenFile: openCommitDiff,
+                      })))
 
       return E('div', { className: 'gw-root' },
         isRepo === false
