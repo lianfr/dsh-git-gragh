@@ -52,6 +52,15 @@ function hashArg(value) {
   return value
 }
 
+function requireTagName(payload) {
+  const name = typeof payload.name === 'string' ? payload.name.trim() : ''
+  if (name === '') throw new GitError('标签名不能为空', 'bad-request', 400)
+  if (/^[-\s]/.test(name) || /[\s~^:?*[\\]/.test(name) || name.indexOf('..') >= 0) {
+    throw new GitError('标签名不合法', 'bad-request', 400)
+  }
+  return name
+}
+
 function pathList(value) {
   if (!Array.isArray(value) || value.length === 0) throw new GitError('缺少文件路径', 'bad-request', 400)
   for (const item of value) {
@@ -372,6 +381,78 @@ async function remoteRemove(payload) {
   return { name: label }
 }
 
+/* ---------------------------- 提交级操作 ---------------------------- */
+
+/** 会失败的操作一律把 git 的原话带回去，这类错误只有原文才说得清原因。 */
+async function step(cwd, args, code, fallback) {
+  const result = await runGit(cwd, args, { allowNonZero: true, timeoutMs: 60_000 })
+  if (result.code !== 0) throw new GitError(failureText(result, fallback), code, 400)
+  return result
+}
+
+async function tagCreate(payload) {
+  const cwd = requireCwd(payload)
+  const name = requireTagName(payload)
+  const hash = hashArg(payload.hash)
+  await runGit(cwd, ['tag', name, hash])
+  return { name, hash }
+}
+
+async function cherryPick(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  await step(cwd, ['cherry-pick', hash], 'cherry-pick-failed', '拣选失败')
+  return { hash }
+}
+
+async function revertCommit(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  await step(cwd, ['revert', '--no-edit', hash], 'revert-failed', '撤销失败')
+  return { hash }
+}
+
+async function mergeCommit(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  await step(cwd, ['merge', '--no-ff', '--no-edit', hash], 'merge-failed', '合并失败')
+  return { hash }
+}
+
+async function rebaseOnto(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  await step(cwd, ['rebase', hash], 'rebase-failed', '变基失败')
+  return { hash }
+}
+
+const RESET_MODES = ['soft', 'mixed', 'hard']
+
+async function resetTo(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  const mode = RESET_MODES.indexOf(payload.mode) >= 0 ? payload.mode : 'mixed'
+  if (mode === 'hard' && payload.confirm !== true) {
+    throw new GitError('硬重置会丢弃工作区的改动，需要二次确认', 'confirm-required', 400)
+  }
+  await runGit(cwd, ['reset', '--' + mode, hash])
+  return { hash, mode }
+}
+
+/** 丢一个提交：把它的父与子接到一起，历史会被改写。 */
+async function dropCommit(payload) {
+  const cwd = requireCwd(payload)
+  const hash = hashArg(payload.hash)
+  if (payload.confirm !== true) {
+    throw new GitError('丢弃提交会改写历史，需要二次确认', 'confirm-required', 400)
+  }
+  const parents = (await gitText(cwd, ['rev-list', '--parents', '-n', '1', hash])).trim().split(' ')
+  if (parents.length > 2) throw new GitError('合并提交不能直接丢弃', 'merge-commit', 400)
+  if (parents.length < 2) throw new GitError('根提交不能丢弃', 'root-commit', 400)
+  await step(cwd, ['rebase', '--onto', parents[1], hash, 'HEAD'], 'drop-failed', '丢弃提交失败')
+  return { hash }
+}
+
 /* ---------------------------- 远程同步 ---------------------------- */
 
 /** 网络类操作给足时间，但仍设上限：卡在认证提示时不该把面板吊死。 */
@@ -435,7 +516,7 @@ async function push(payload) {
 /* ============================== 方法表与 HTTP ============================== */
 
 const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes }
-const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push }
+const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 
 function headerOf(req, nameOfHeader) {
