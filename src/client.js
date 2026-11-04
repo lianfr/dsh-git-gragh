@@ -85,6 +85,14 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
 .gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
 .gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
+.gw-icon { position:relative; }
+.gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
+  padding:3px 7px; border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
+  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  border:1px solid var(--dsw-alias-border-l2); box-shadow:0 4px 14px rgba(0,0,0,.22);
+  font-size:11px; font-weight:400; line-height:1.4; white-space:nowrap;
+  opacity:0; visibility:hidden; pointer-events:none; transition:opacity .12s ease; z-index:10000; }
+.gw-icon:hover::after { opacity:1; visibility:visible; }
 .gw-icon-on { color:var(--dsw-alias-brand-primary); }
 .gw-icon-on:hover { color:var(--dsw-alias-brand-primary); }
 
@@ -1120,6 +1128,7 @@ window.__ModuleLoader__.load({
       const [focus, setFocus] = useState(false)
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
+      const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
       const [detail, setDetail] = useState(null)
@@ -1594,7 +1603,6 @@ window.__ModuleLoader__.load({
         summary !== null && summary.ahead > 0 ? E('span', { className: 'gw-ahead' }, '↑' + String(summary.ahead)) : null,
         summary !== null && summary.behind > 0 ? E('span', { className: 'gw-behind' }, '↓' + String(summary.behind)) : null,
         E('span', { className: 'gw-spacer' }),
-        E('span', { className: 'gw-count' }, entries.length + ' / ' + (hasMore ? '…' : entries.length)),
         iconButton({
           title: focus === true ? t('viewAll') : t('viewFocus'),
           active: focus === true,
@@ -1645,7 +1653,11 @@ window.__ModuleLoader__.load({
         }),
         iconButton({
           title: t('moreActions'),
-          onClick: () => setMoreOpen(true),
+          onClick: (event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setMorePos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
+            setMoreOpen(true)
+          },
           path: '',
           extra: [
             E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
@@ -1773,7 +1785,7 @@ window.__ModuleLoader__.load({
         },
           E('div', {
             className: 'gw-menu',
-            style: { position: 'absolute', right: '12px', bottom: '12px' },
+            style: { top: morePos.top + 'px', right: morePos.right + 'px' },
           },
             E('div', {
               className: 'gw-menu-item',
@@ -1810,7 +1822,8 @@ window.__ModuleLoader__.load({
             extras)
       return E('button', {
         className: 'gw-icon' + (props.active === true ? ' gw-icon-on' : ''),
-        title: props.title,
+        'data-tip': props.title,
+        'aria-label': props.title,
         disabled: props.disabled === true,
         onClick: props.onClick,
       }, children)
