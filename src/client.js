@@ -1198,11 +1198,13 @@ window.__ModuleLoader__.load({
                           + ' C' + x1 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 1.35)
                           + ' L' + x2 + ',' + y2
                       }
+                      // 未提交那一行不属于任何分支，它连下来的线跟着用中性灰
+                      const ghost = rowEntries[edge.from] !== undefined && rowEntries[edge.from].uncommitted === true
                       return E('path', {
                         key: 'e' + String(index),
                         d: d,
                         fill: 'none',
-                        stroke: laneColor(edge.primary ? edge.fromLane : edge.toLane),
+                        stroke: ghost ? 'var(--dsw-alias-label-tertiary)' : laneColor(edge.primary ? edge.fromLane : edge.toLane),
                         strokeWidth: edge.primary ? 1.6 : 1.2,
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
