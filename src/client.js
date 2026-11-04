@@ -365,14 +365,15 @@ window.__ModuleLoader__.load({
         }
       }
 
-      // 一、切链：每行沿第一父往下走，撞到已经有主的提交、或撞到别的分支尖端就停。
-      // 一条链就是图上一段连续画下来的线，链内不会断开。
+      // 一、切链：一条链从它的起点沿第一父一路往下走，撞到已经有主的提交就停。
+      // 建链的次序是 主干 → 各分支尖端 → 其余提交：先建的分支先占住自己的历史，
+      // 后建的撞上去就停。所以一条分支从头到尾是一条链、一个颜色，
+      // 中途换到哪一列都还是它自己，不会在分叉口断成两种颜色。
       const chainOf = new Array(entries.length).fill(-1)
       const chains = []
-      for (let i = 0; i < entries.length; i++) {
-        if (chainOf[i] >= 0) continue
-        const chain = { first: i, last: i, lane: 0, color: 0 }
-        let row = i
+      const createChain = (startRow) => {
+        const chain = { first: startRow, last: startRow, lane: 0, color: 0 }
+        let row = startRow
         while (row >= 0 && chainOf[row] < 0) {
           chainOf[row] = chains.length
           chain.last = row
@@ -380,19 +381,23 @@ window.__ModuleLoader__.load({
           if (parents.length === 0) break
           const next = rowOfHash.get(parents[0])
           if (next === undefined || next <= row) break
-          if (isTip[next]) break
           row = next
         }
         chains.push(chain)
       }
-
-      // 二、分列：主分支锁第 0 列；其余的从左往右找第一条满足
-      // 「自己这条链的起点，落在该列上一段的结束行之下至少再隔一行」的道。
-      // 差那一行就是为了不让两段首尾相接、连成一根直线。
       const trunkRow = rowOfHash.get(trunkTip)
+      if (trunkRow !== undefined) createChain(trunkRow)
+      for (let i = 0; i < entries.length; i++) if (isTip[i] && chainOf[i] < 0) createChain(i)
+      for (let i = 0; i < entries.length; i++) if (chainOf[i] < 0) createChain(i)
+
+      // 二、分列：主分支锁第 0 列；其余的从父列右边起，往右找第一条
+      // 「这条链的起点落在该列上一段结束之后」的道，找不到就新开一列。
       const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
 
       const laneLast = []
+      // 同一列会被不同时间段的链复用。每复用一次，颜色往后顺延一格，
+      // 这样同一道上相邻的两条链颜色必然不同，不会看着像一条线接下去。
+      const laneUses = []
       const laneOfRow = new Array(entries.length).fill(-1)
 
       const fillRows = (chainIndex) => {
@@ -405,7 +410,7 @@ window.__ModuleLoader__.load({
       const takeLane = (chainIndex) => {
         const chain = chains[chainIndex]
         if (chainIndex === trunkChain) {
-          if (laneLast.length === 0) laneLast.push(chain.last)
+          if (laneLast.length === 0) { laneLast.push(chain.last); laneUses.push(0) }
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
           chain.color = 0
@@ -424,14 +429,16 @@ window.__ModuleLoader__.load({
         for (let j = start; j < laneLast.length; j++) {
           if (chain.first > laneLast[j]) {
             chain.lane = j
-            chain.color = j
+            chain.color = j + laneUses[j]
             laneLast[j] = chain.last
+            laneUses[j] += 1
             fillRows(chainIndex)
             return
           }
         }
-        while (laneLast.length < start) laneLast.push(-1)
+        while (laneLast.length < start) { laneLast.push(-1); laneUses.push(0) }
         laneLast.push(chain.last)
+        laneUses.push(0)
         chain.lane = laneLast.length - 1
         chain.color = chain.lane
         fillRows(chainIndex)
