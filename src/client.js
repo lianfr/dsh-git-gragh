@@ -800,6 +800,8 @@ window.__ModuleLoader__.load({
           const signature = signatureOf(view)
           if (signature === lastSigRef.current) return
           lastSigRef.current = signature
+          // 仓库状态在面板之外被改动时，已展开的详情可能已过期，先收起再拉历史
+          setSelected(null)
           await refreshLog()
         }, POLL_MS)
         return () => { stopped = true; clearInterval(timer) }
