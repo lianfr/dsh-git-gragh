@@ -8,6 +8,7 @@ window.__ModuleLoader__.load({
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
+    const UNCOMMITTED_HASH = '@uncommitted'
   const POLL_MS = 3000
     const ROW_H = 24
     const LANE_W = 14
@@ -89,7 +90,9 @@ window.__ModuleLoader__.load({
 .gw-row-sel, .gw-row-sel:hover { background:var(--dsw-alias-interactive-bg-active);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
-.gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
+.gw-row-ghost { cursor: default; }
+    .gw-row-ghost .gw-row-subject { color: var(--dsw-alias-label-secondary); }
+    .gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
   color:var(--dsw-alias-label-tertiary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-row-sep { opacity:.5; }
@@ -185,6 +188,7 @@ window.__ModuleLoader__.load({
         discardConfirm: '确定丢弃对 {path} 的更改？此操作无法撤销。',
         discardAllConfirm: '确定丢弃全部未暂存更改？此操作无法撤销。',
         noChanges: '工作区干净',
+        uncommitted: '未提交的更改',
         noCommits: '还没有提交',
         noRepo: '当前工作目录不是 Git 仓库',
         loading: '加载中…',
@@ -222,6 +226,7 @@ window.__ModuleLoader__.load({
         discardConfirm: 'Discard changes in {path}? This cannot be undone.',
         discardAllConfirm: 'Discard all unstaged changes? This cannot be undone.',
         noChanges: 'Working tree clean',
+        uncommitted: 'Uncommitted changes',
         noCommits: 'No commits yet',
         noRepo: 'Current directory is not a Git repository',
         loading: 'Loading…',
@@ -393,6 +398,16 @@ window.__ModuleLoader__.load({
         rowLane[i] = lane
         if (lane + 1 > laneCount) laneCount = lane + 1
       }
+
+      // 未提交的改动跟它所属的分支同列，不单独占一条泳道
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i].uncommitted !== true) continue
+        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
+        if (row !== undefined) rowLane[i] = rowLane[row]
+      }
+      laneCount = 1
+      for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
 
       const edges = []
       for (let i = 0; i < entries.length; i++) {
@@ -573,6 +588,14 @@ window.__ModuleLoader__.load({
       const y = props.y
       const t = props.t
       const refs = Array.isArray(entry.refs) ? entry.refs : []
+      if (entry.uncommitted === true) {
+        return E('div', {
+          className: 'gw-row gw-row-ghost',
+          style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
+          title: entry.subject,
+        },
+          E('span', { className: 'gw-row-subject' }, entry.subject))
+      }
       return E('div', {
         className: 'gw-row' + (props.selected ? ' gw-row-sel' : ''),
         style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
@@ -960,21 +983,38 @@ window.__ModuleLoader__.load({
       const unstaged = changes.filter((item) => item.conflicted !== true && item.staged !== true && item.untracked !== true)
       const untracked = changes.filter((item) => item.untracked === true)
 
-      const layout = useMemo(() => computeLayout(entries), [entries])
+      // 未提交的改动单独占一行，形状与提交一致，但不指向任何对象
+      const changeTotal = conflicted.length + staged.length + unstaged.length + untracked.length
+      const headHash = summary === null || summary.head === undefined ? null : summary.head
+      const rowEntries = useMemo(() => {
+        if (changeTotal === 0) return entries
+        return [{
+          hash: UNCOMMITTED_HASH,
+          short: '',
+          parents: headHash === null ? [] : [headHash],
+          author: '',
+          time: 0,
+          refs: [],
+          subject: t('uncommitted') + ' (' + String(changeTotal) + ')',
+          uncommitted: true,
+        }].concat(entries)
+      }, [entries, changeTotal, headHash, t])
+
+      const layout = useMemo(() => computeLayout(rowEntries), [rowEntries])
       const laneWidth = Math.max(24, layout.laneCount * LANE_W + 16)
 
       const offsets = useMemo(() => {
         const list = []
         let y = 0
-        for (let i = 0; i < entries.length; i++) {
+        for (let i = 0; i < rowEntries.length; i++) {
           list.push(y)
           y += ROW_H
-          if (selected !== null && entries[i].hash === selected) y += DRAWER_H
+          if (selected !== null && rowEntries[i].hash === selected) y += DRAWER_H
         }
         return { list: list, total: y }
-      }, [entries, selected])
+      }, [rowEntries, selected])
 
-      entriesRef.current = entries
+      entriesRef.current = rowEntries
       offsetsRef.current = offsets
 
       // 列表替换后把锚点那一行对回原来的滚动位置；用户停在顶部时不干预
@@ -984,27 +1024,27 @@ window.__ModuleLoader__.load({
         pendingAnchorRef.current = null
         const node = bodyRef.current
         if (node === null) return
-        const index = entries.findIndex((item) => item.hash === anchor.hash)
+        const index = rowEntries.findIndex((item) => item.hash === anchor.hash)
         if (index < 0) return
         node.scrollTop = offsets.list[index] + anchor.delta
-      }, [entries, offsets])
+      }, [rowEntries, offsets])
 
       const svgHeight = offsets.total
       // 抽屉展开的那一行在列表里的下标，用于判断某条连线是否跨过抽屉区间
       const selectedIndex = useMemo(() => {
         if (selected === null) return -1
-        for (let i = 0; i < entries.length; i++) {
-          if (entries[i].hash === selected) return i
+        for (let i = 0; i < rowEntries.length; i++) {
+          if (rowEntries[i].hash === selected) return i
         }
         return -1
-      }, [selected, entries])
+      }, [selected, rowEntries])
       const drawerTop = useMemo(() => {
         if (selected === null) return 0
-        for (let i = 0; i < entries.length; i++) {
-          if (entries[i].hash === selected) return offsets.list[i] + ROW_H
+        for (let i = 0; i < rowEntries.length; i++) {
+          if (rowEntries[i].hash === selected) return offsets.list[i] + ROW_H
         }
         return 0
-      }, [selected, entries, offsets])
+      }, [selected, rowEntries, offsets])
 
       const toggleGroup = useCallback((key) => {
         setOpenGroups((prev) => {
@@ -1122,7 +1162,7 @@ window.__ModuleLoader__.load({
             onBack: () => setDiffView(null),
           })
         : E('div', { className: 'gw-graph-body', onScroll: onScroll, ref: bodyRef },
-            entries.length === 0
+            rowEntries.length === 0
               ? E('div', { className: 'gw-empty' }, summary !== null && summary.empty === true ? t('noCommits') : t('noCommits'))
               : E('div', { className: 'gw-canvas', style: { height: svgHeight + 'px' } },
                   E('svg', {
@@ -1158,24 +1198,29 @@ window.__ModuleLoader__.load({
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
                     }),
-                    entries.map((entry, index) => E('circle', {
-                      key: 'c' + String(index),
-                      cx: layout.rowLane[index] * LANE_W + 12,
-                      cy: offsets.list[index] + ROW_H / 2,
-                      r: 3.4,
-                      fill: laneColor(layout.rowLane[index]),
-                      stroke: 'var(--dsw-alias-bg-layer-1)',
-                      strokeWidth: 1.2,
-                    }))),
-                  entries.map((entry, index) => E(GraphRow, {
+                    rowEntries.map((entry, index) => {
+                      const hollow = entry.uncommitted === true || (headHash !== null && entry.hash === headHash)
+                      return E('circle', {
+                        key: 'c' + String(index),
+                        cx: layout.rowLane[index] * LANE_W + 12,
+                        cy: offsets.list[index] + ROW_H / 2,
+                        r: hollow ? 3.6 : 3.4,
+                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowLane[index]),
+                        stroke: hollow === false
+                          ? 'var(--dsw-alias-bg-layer-1)'
+                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowLane[index])),
+                        strokeWidth: hollow ? 1.6 : 1.2,
+                      })
+                    })),
+                  rowEntries.map((entry, index) => E(GraphRow, {
                     key: entry.hash,
                     entry: entry,
                     y: offsets.list[index],
                     laneWidth: laneWidth,
                     t: t,
                     selected: selected === entry.hash,
-                    onClick: () => { void selectCommit(entry) },
-                    onContextMenu: (event) => {
+                    onClick: entry.uncommitted === true ? null : () => { void selectCommit(entry) },
+                    onContextMenu: entry.uncommitted === true ? null : (event) => {
                       event.preventDefault()
                       setMenu({ x: event.clientX, y: event.clientY, entry: entry })
                     },
