@@ -103,9 +103,11 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary); }
 
 .gw-drawer { position:absolute; right:0; background:var(--dsw-alias-bg-layer-1);
-  background:color-mix(in srgb, var(--dsw-alias-label-primary) 5%, var(--dsw-alias-bg-layer-1));
-  border-bottom:1px solid var(--dsw-alias-border-l2);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-layer-1));
+  border-left:1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
+.gw-drawer-rule { position:absolute; left:0; right:0; border-top:1px solid var(--dsw-alias-border-l2);
+  pointer-events:none; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
 .gw-detail-msg { white-space:pre-wrap; font-size:12px; margin:0 0 8px; color:var(--dsw-alias-label-primary); }
 .gw-kv { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:11.5px; margin-bottom:8px; }
@@ -1134,14 +1136,19 @@ window.__ModuleLoader__.load({
                   })),
                   selected === null
                     ? null
-                    : E(CommitDrawer, {
-                        t: t,
-                        detail: detail,
-                        top: drawerTop,
-                        left: laneWidth,
-                        height: DRAWER_H,
-                        onOpenFile: openCommitDiff,
-                      })))
+                    : E('div', { key: 'drawer' },
+                        E(CommitDrawer, {
+                          t: t,
+                          detail: detail,
+                          top: drawerTop,
+                          left: laneWidth,
+                          height: DRAWER_H,
+                          onOpenFile: openCommitDiff,
+                        }),
+                        E('div', {
+                          className: 'gw-drawer-rule',
+                          style: { top: (drawerTop + DRAWER_H) + 'px' },
+                        }))))
 
       return E('div', { className: 'gw-root' },
         isRepo === false
