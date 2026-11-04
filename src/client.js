@@ -86,7 +86,10 @@ window.__ModuleLoader__.load({
 .gw-row:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-row-sel { background:var(--dsw-alias-interactive-bg-active); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
-.gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px; }
+.gw-row-meta { display:flex; align-items:center; gap:6px; flex:none; font-size:11px;
+  color:var(--dsw-alias-label-tertiary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-row-sep { opacity:.5; }
 
 .gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
@@ -561,7 +564,11 @@ window.__ModuleLoader__.load({
         refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
         E('span', { className: 'gw-row-meta' },
-          entry.author + ' · ' + relativeTime(entry.time, t) + ' · ' + entry.short))
+          E('span', null, entry.author),
+          E('span', { className: 'gw-row-sep' }, '·'),
+          E('span', null, relativeTime(entry.time, t)),
+          E('span', { className: 'gw-row-sep' }, '·'),
+          E('span', null, entry.short)))
     }
 
     function DiffPane(props) {
@@ -734,8 +741,7 @@ window.__ModuleLoader__.load({
       }, [cwd])
 
       const refreshAll = useCallback(async () => {
-        await refreshSummary()
-        await refreshLog()
+        await Promise.all([refreshSummary(), refreshLog()])
       }, [refreshSummary, refreshLog])
 
       // 只在切换仓库时清空视图；可见性变化只负责重新拉取，避免同一次挂载发起两轮请求。
