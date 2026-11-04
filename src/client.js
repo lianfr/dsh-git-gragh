@@ -84,11 +84,12 @@ window.__ModuleLoader__.load({
 .gw-ahead { color:var(--dsw-alias-state-success-primary); }
 .gw-behind { color:var(--dsw-alias-state-warn-primary); }
 .gw-spacer { flex:1 1 auto; }
-.gw-bar { display:flex; align-items:center; gap:2px; padding:0 0 6px 0; min-height:22px; }
-.gw-bar-title { font-size:11px; font-weight:600; letter-spacing:.02em;
-  color:var(--dsw-alias-label-secondary); }
+.gw-bar { display:flex; flex-direction:row; align-items:center; gap:6px;
+  padding:0 0 8px 0; min-height:30px; flex:none; }
+.gw-bar-title { font-size:14px; font-weight:600; color:var(--dsw-alias-label-primary);
+  margin-right:2px; }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
-  width:22px; height:22px; padding:0; border:none; border-radius:5px; background:transparent;
+  width:24px; height:24px; padding:0; border:none; border-radius:5px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
 .gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
 .gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
