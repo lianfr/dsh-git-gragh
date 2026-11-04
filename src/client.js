@@ -56,7 +56,11 @@ window.__ModuleLoader__.load({
 .gw-group-head { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-group-head .gw-caret { width:10px; display:inline-block; text-align:center; opacity:.7; }
+.gw-group-head .gw-tree-dir { cursor:pointer; color:var(--dsw-alias-label-secondary); }
+.gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:11.5px; }
+.gw-tree-dir:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-caret { width:10px; display:inline-block; text-align:center; opacity:.7; }
 .gw-count { color:var(--dsw-alias-label-tertiary); }
 .gw-group-actions { margin-left:auto; display:flex; gap:4px; }
 
@@ -246,6 +250,14 @@ window.__ModuleLoader__.load({
 .gw-btn-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 85%, #000); }
 .gw-menu-danger { color:var(--dsw-alias-state-error-primary); }
 .gw-menu-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent); }
+.gw-menu-item { position:relative; }
+.gw-menu-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-menu-parent > .gw-menu-arrow { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; }
+.gw-menu-off { opacity:.45; cursor:default; }
+.gw-menu-sub { display:none; position:absolute; left:100%; top:-6px; min-width:150px;
+  padding:4px 0; border-radius:8px; border:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-3); box-shadow:0 12px 28px rgba(0,0,0,.3); z-index:20; }
+.gw-menu-parent:hover > .gw-menu-sub { display:block; }
 .gw-menu-sep { height:1px; margin:4px 6px; background:var(--dsw-alias-border-l1); }
 .gw-scrim { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.32);
   display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -295,7 +307,7 @@ window.__ModuleLoader__.load({
       zh: {
         title: 'Git',
         description: '提交图与变更管理',
-        commitPlaceholder: '提交信息',
+        commitPlaceholder: '写点提交信息…',
         commit: '提交',
         commitAmend: '修补上一次提交',
         staged: '已暂存',
@@ -313,6 +325,43 @@ window.__ModuleLoader__.load({
         push: '推送',
         publish: '发布分支',
         syncRunning: '正在执行…',
+        treeView: '以树形式查看',
+        flatView: '以列表形式查看',
+        settings: '设置',
+        clone: '克隆…',
+        cloneUrl: '从远程地址克隆',
+        cloneTo: '克隆到当前工作区',
+        checkoutTo: '签出到…',
+        checkoutBranch: '切换到分支…',
+        checkoutTag: '切换到标签…',
+        fetch: '抓取',
+        commitGroup: '提交',
+        commitStaged: '提交已暂存的更改',
+        commitAll: '提交全部更改',
+        amendLast: '修补上一次提交',
+        undoLastCommit: '撤销上一次提交',
+        changesGroup: '更改',
+        stageAllChanges: '暂存全部更改',
+        unstageAllChanges: '取消暂存全部',
+        discardAllChanges: '放弃全部更改',
+        syncGroup: '拉取、推送',
+        pullThenPush: '先拉取再推送',
+        branchesGroup: '分支',
+        createBranchItem: '新建分支…',
+        deleteBranchItem: '删除分支…',
+        renameBranchItem: '重命名分支…',
+        remotesGroup: '远程',
+        addRemoteItem: '添加远程…',
+        removeRemoteItem: '移除远程…',
+        editRemoteItem: '编辑远程…',
+        stashGroup: '存储',
+        stashSaveItem: '保存当前更改为存储',
+        stashApplyItem: '应用最近的存储',
+        stashDropItem: '丢弃最近的存储',
+        tagsGroup: '标记',
+        tagCreateItem: '新建标签…',
+        tagDeleteItem: '删除标签…',
+        showOutput: '显示 Git 输出',
         remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
         remoteEmpty: '还没有配置远程仓库',
@@ -405,6 +454,43 @@ window.__ModuleLoader__.load({
         push: 'Push',
         publish: 'Publish branch',
         syncRunning: 'Running…',
+        treeView: 'View as tree',
+        flatView: 'View as list',
+        settings: 'Settings',
+        clone: 'Clone…',
+        cloneUrl: 'Clone from URL',
+        cloneTo: 'Clone into workspace',
+        checkoutTo: 'Checkout to…',
+        checkoutBranch: 'Checkout branch…',
+        checkoutTag: 'Checkout tag…',
+        fetch: 'Fetch',
+        commitGroup: 'Commit',
+        commitStaged: 'Commit staged',
+        commitAll: 'Commit all',
+        amendLast: 'Amend last commit',
+        undoLastCommit: 'Undo last commit',
+        changesGroup: 'Changes',
+        stageAllChanges: 'Stage all changes',
+        unstageAllChanges: 'Unstage all changes',
+        discardAllChanges: 'Discard all changes',
+        syncGroup: 'Pull, Push',
+        pullThenPush: 'Pull then push',
+        branchesGroup: 'Branch',
+        createBranchItem: 'Create branch…',
+        deleteBranchItem: 'Delete branch…',
+        renameBranchItem: 'Rename branch…',
+        remotesGroup: 'Remote',
+        addRemoteItem: 'Add remote…',
+        removeRemoteItem: 'Remove remote…',
+        editRemoteItem: 'Edit remote…',
+        stashGroup: 'Stash',
+        stashSaveItem: 'Stash changes',
+        stashApplyItem: 'Apply latest stash',
+        stashDropItem: 'Drop latest stash',
+        tagsGroup: 'Tag',
+        tagCreateItem: 'Create tag…',
+        tagDeleteItem: 'Delete tag…',
+        showOutput: 'Show Git output',
         remotes: 'Remotes',
         openInTerminal: 'Open repository in terminal',
         remoteEmpty: 'No remotes configured',
@@ -994,6 +1080,7 @@ window.__ModuleLoader__.load({
 
     function FileRow(props) {
       const item = props.item
+      const extra = props.style === undefined ? null : props.style
       const t = props.t
       const parts = dirAndName(item.path)
       const conflicted = item.conflicted === true
@@ -1030,6 +1117,81 @@ window.__ModuleLoader__.load({
           }, '⤺')))
     }
 
+    /** 把扁平的路径表折成树：中间节点是目录，叶子才是真的文件。 */
+    function buildTree(items) {
+      const root = { name: '', path: '', dir: true, children: [], item: null }
+      const dirs = new Map()
+      dirs.set('', root)
+      for (const item of items) {
+        const parts = String(item.path).split('/')
+        let parent = root
+        let acc = ''
+        for (let i = 0; i < parts.length - 1; i++) {
+          acc = acc === '' ? parts[i] : acc + '/' + parts[i]
+          if (!dirs.has(acc)) {
+            const node = { name: parts[i], path: acc, dir: true, children: [], item: null }
+            dirs.set(acc, node)
+            parent.children.push(node)
+          }
+          parent = dirs.get(acc)
+        }
+        parent.children.push({
+          name: parts[parts.length - 1], path: item.path, dir: false, children: [], item: item,
+        })
+      }
+      const sort = (node) => {
+        node.children.sort((a, b) => {
+          if (a.dir !== b.dir) return a.dir ? -1 : 1
+          return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+        })
+        for (const child of node.children) if (child.dir) sort(child)
+      }
+      sort(root)
+      return root.children
+    }
+
+    /** 树形视图里的一行：目录只显示名字和计数，文件沿用 FileRow。 */
+    function TreeRow(props) {
+      const node = props.node
+      const depth = props.depth
+      const pad = { paddingLeft: String(10 + depth * 12) + 'px' }
+      if (node.dir === false) {
+        return E(FileRow, {
+          item: node.item,
+          t: props.t,
+          style: pad,
+          onOpen: props.onOpen,
+          onStage: props.onStage,
+          onUnstage: props.onUnstage,
+          onDiscard: props.onDiscard,
+        })
+      }
+      const open = props.collapsed.has(node.path) === false
+      return E('div', null,
+        E('div', {
+          className: 'gw-row gw-tree-dir',
+          style: pad,
+          onClick: () => props.onToggleDir(node.path),
+        },
+          E('span', { className: 'gw-caret' }, open ? '▾' : '▸'),
+          E('span', { className: 'gw-tree-name' }, node.name),
+          E('span', { className: 'gw-count' }, ' ' + String(node.children.length))),
+        open
+          ? node.children.map((child, index) => E(TreeRow, {
+              key: child.path + ':' + String(index),
+              node: child,
+              depth: depth + 1,
+              t: props.t,
+              collapsed: props.collapsed,
+              onToggleDir: props.onToggleDir,
+              onOpen: props.onOpen,
+              onStage: props.onStage,
+              onUnstage: props.onUnstage,
+              onDiscard: props.onDiscard,
+            }))
+          : null)
+    }
+
     function ChangeGroup(props) {
       const t = props.t
       const items = props.items
@@ -1041,8 +1203,20 @@ window.__ModuleLoader__.load({
           props.action === undefined || props.action === null
             ? null
             : E('span', { className: 'gw-group-actions' }, props.action)),
-        props.open
-          ? items.map((item, index) => E(FileRow, {
+        props.open === false ? null : props.tree === true
+          ? buildTree(items).map((node, index) => E(TreeRow, {
+              key: 't' + String(index),
+              node: node,
+              depth: 0,
+              t: t,
+              collapsed: props.collapsed,
+              onToggleDir: props.onToggleDir,
+              onOpen: props.onOpen,
+              onStage: props.onStage,
+              onUnstage: props.onUnstage,
+              onDiscard: props.onDiscard,
+            }))
+          : items.map((item, index) => E(FileRow, {
               key: item.path + ':' + String(index),
               item: item,
               t: t,
@@ -1050,8 +1224,7 @@ window.__ModuleLoader__.load({
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
-            }))
-          : null)
+            })))
     }
 
     function GraphRow(props) {
@@ -1262,7 +1435,7 @@ window.__ModuleLoader__.load({
       }, label)
       const act = (kind) => () => { props.onClose(); props.onAction(kind, entry) }
 
-      return E('div', { ref: ref, className: 'gw-menu', style: { left: pos.left + 'px', top: pos.top + 'px' } },
+      return E('div', { ref: ref, className: 'gw-menu gw-menu-ctx', style: { left: pos.left + 'px', top: pos.top + 'px' } },
         item(t('addTag'), act('tag')),
         item(t('branchHere'), act('branch')),
         E('div', { className: 'gw-menu-sep' }),
@@ -1313,6 +1486,9 @@ window.__ModuleLoader__.load({
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
       const [ask, setAsk] = useState(null)
+      const [treeView, setTreeView] = useState(false)
+      const [settingsOpen, setSettingsOpen] = useState(false)
+      const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
       const [menu, setMenu] = useState(null)
@@ -1548,6 +1724,14 @@ window.__ModuleLoader__.load({
       }), [cwd, run, loadRemotes, refreshSummary])
 
       /** 网络操作单独记忙标记，避免把整块面板的其它按钮一起锁住。 */
+      const toggleDir = useCallback((path) => {
+        setCollapsedDirs((previous) => (
+          previous.indexOf(path) >= 0 ? previous.filter((item) => item !== path) : previous.concat([path])
+        ))
+      }, [])
+
+      const collapsedSet = useMemo(() => new Set(collapsedDirs), [collapsedDirs])
+
       const doSync = useCallback((method) => {
         if (syncBusy !== '') return
         void run(async () => {
@@ -1808,6 +1992,20 @@ window.__ModuleLoader__.load({
         }
       }, [cwd, run, refreshAll, t, onBranch, onCheckout])
 
+      /** 菜单行：给了 action 就能点，给了 children 就在右侧展开下一级。 */
+      const menuRow = (label, action, children) => {
+        const kids = Array.isArray(children) ? children : []
+        const leaf = kids.length === 0
+        return E('div', {
+          className: 'gw-menu-item' + (leaf ? '' : ' gw-menu-parent') + (leaf && action === null ? ' gw-menu-off' : ''),
+          onClick: action === null ? undefined : action,
+        },
+          E('span', { className: 'gw-menu-label' }, label),
+          leaf ? null : E('div', { className: 'gw-menu-sub' },
+            kids.map((kid, index) => E('div', { key: 's' + String(index), className: 'gw-menu-item' }, kid))))
+      }
+      const subMenu = (label, children) => menuRow(label, null, children)
+
       if (cwd === '') {
         return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
       }
@@ -1849,11 +2047,13 @@ window.__ModuleLoader__.load({
               : E('div', null,
                   E(ChangeGroup, {
                     title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('conflicts'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
                   }),
                   E(ChangeGroup, {
                     title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('staged'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
                     action: staged.length === 0 ? null : E('button', {
@@ -1863,6 +2063,7 @@ window.__ModuleLoader__.load({
                   }),
                   E(ChangeGroup, {
                     title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('changes'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
                     action: unstaged.length === 0 ? null : E('button', {
@@ -1872,6 +2073,7 @@ window.__ModuleLoader__.load({
                   }),
                   E(ChangeGroup, {
                     title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('untracked'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
                     action: untracked.length === 0 ? null : E('button', {
@@ -1926,6 +2128,17 @@ window.__ModuleLoader__.load({
           extra: E('path', { d: 'M3.2 13.4h9.6' }),
         }),
         iconButton({
+          title: treeView === true ? t('flatView') : t('treeView'),
+          active: treeView === true,
+          onClick: () => setTreeView(treeView === false),
+          path: treeView === true ? 'M3 4h10M3 8h10M3 12h10' : 'M4 3v10M4 6h5M4 11h5',
+        }),
+        iconButton({
+          title: t('remotes'),
+          onClick: () => setRemoteOpen(true),
+          path: 'M5.5 12.5a3 3 0 0 1 .3-6 3.8 3.8 0 0 1 7.2 .8 2.6 2.6 0 0 1-.5 5.2H5.5z',
+        }),
+        iconButton({
           title: summary !== null && summary.upstream === null ? t('publish') : t('push'),
           busy: syncBusy === 'push',
           disabled: isRepo === false || syncBusy !== '',
@@ -1937,6 +2150,11 @@ window.__ModuleLoader__.load({
           title: t('refresh'),
           onClick: () => { void refreshAll() },
           path: 'M13 8a5 5 0 1 1-1.5-3.6M13.2 2.6v3.2h-3.2',
+        }),
+        iconButton({
+          title: t('settings'),
+          onClick: () => setSettingsOpen(true),
+          path: 'M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM8 2.2l.6 1.5 1.6-.4 1 1.3-.9 1.4.9 1.4-1 1.3-1.6-.4-.6 1.5H6.9l-.6-1.5-1.6.4-1-1.3.9-1.4-.9-1.4L4.7 3.3l1.6.4L6.9 2.2z',
         }),
         iconButton({
           title: t('moreActions'),
@@ -2075,12 +2293,23 @@ window.__ModuleLoader__.load({
             className: 'gw-menu',
             style: { top: morePos.top + 'px', right: morePos.right + 'px' },
           },
-            E('div', {
-              className: 'gw-menu-item',
-              onClick: () => { setMoreOpen(false); setRemoteOpen(true) },
-            }, t('remotes')),
+            menuRow(t('fetchAll'), () => { setMoreOpen(false); doSync('fetchAll') }),
             E('div', { className: 'gw-menu-sep' }),
-            E('div', { className: 'gw-menu-item' }, t('openInTerminal')))),
+            menuRow(t('pull'), () => { setMoreOpen(false); doSync('pull') }),
+            menuRow(t('push'), () => { setMoreOpen(false); doSync('push') }),
+            menuRow(t('clone'), null, [t('cloneUrl'), t('cloneTo')]),
+            menuRow(t('checkoutTo'), null, [t('checkoutBranch'), t('checkoutTag')]),
+            menuRow(t('fetch'), () => { setMoreOpen(false); doSync('fetchAll') }),
+            E('div', { className: 'gw-menu-sep' }),
+            subMenu(t('commitGroup'), [t('commitStaged'), t('commitAll'), t('amendLast'), t('undoLastCommit')]),
+            subMenu(t('changesGroup'), [t('stageAllChanges'), t('unstageAllChanges'), t('discardAllChanges')]),
+            subMenu(t('syncGroup'), [t('pullThenPush')]),
+            subMenu(t('branchesGroup'), [t('createBranchItem'), t('deleteBranchItem'), t('renameBranchItem')]),
+            subMenu(t('remotesGroup'), [t('addRemoteItem'), t('removeRemoteItem'), t('editRemoteItem')]),
+            subMenu(t('stashGroup'), [t('stashSaveItem'), t('stashApplyItem'), t('stashDropItem')]),
+            subMenu(t('tagsGroup'), [t('tagCreateItem'), t('tagDeleteItem')]),
+            E('div', { className: 'gw-menu-sep' }),
+            menuRow(t('showOutput'), null, [t('openInTerminal')]))),
         ask === null ? null : E(AskDialog, {
           t: t,
           title: ask.title,
