@@ -138,6 +138,9 @@ window.__ModuleLoader__.load({
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:9px; color:var(--dsw-alias-label-tertiary); white-space:nowrap; }
 .gw-ref-remote .gw-ref-label { font-style:italic; }
+/* 后面还接着远程那格时，文字格的右边不再是外沿，圆角与右边框都让给它。 */
+.gw-ref-linked .gw-ref-label { border-radius:0; border-right:none; }
+.gw-ref-linked .gw-ref-remotes { border-left:1px solid var(--dsw-alias-border-l2); }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
   background:var(--dsw-alias-bg-layer-1);
@@ -701,6 +704,7 @@ window.__ModuleLoader__.load({
       const visible = hasRemotes ? 96 : 130
       const shift = Math.max(0, textWidth - visible)
       const seconds = shift === 0 ? 0 : Math.max(0.6, shift / 36)
+      if (hasRemotes) cls += ' gw-ref-linked'
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
         E('span', { className: 'gw-ref-label' },
