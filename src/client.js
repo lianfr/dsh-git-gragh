@@ -84,6 +84,9 @@ window.__ModuleLoader__.load({
 .gw-ahead { color:var(--dsw-alias-state-success-primary); }
 .gw-behind { color:var(--dsw-alias-state-warn-primary); }
 .gw-spacer { flex:1 1 auto; }
+.gw-bar { display:flex; align-items:center; gap:2px; padding:0 0 6px 0; min-height:22px; }
+.gw-bar-title { font-size:11px; font-weight:600; letter-spacing:.02em;
+  color:var(--dsw-alias-label-secondary); }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
   width:22px; height:22px; padding:0; border:none; border-radius:5px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
@@ -2012,6 +2015,41 @@ window.__ModuleLoader__.load({
 
       const isRepo = summary !== null && summary.isRepo === true
 
+      const changeBar = E('div', { className: 'gw-bar' },
+        E('span', { className: 'gw-bar-title' }, t('changes')),
+        E('span', { className: 'gw-count' }, String(changes.length)),
+        E('span', { className: 'gw-spacer' }),
+        iconButton({
+          title: treeView === true ? t('flatView') : t('treeView'),
+          active: treeView === true,
+          onClick: () => setTreeView(treeView === false),
+          path: treeView === true ? 'M3 4h10M3 8h10M3 12h10' : 'M4 3v10M4 6h5M4 11h5',
+        }),
+        iconButton({
+          title: t('remotes'),
+          onClick: () => setRemoteOpen(true),
+          path: 'M5.5 12.5a3 3 0 0 1 .3-6 3.8 3.8 0 0 1 7.2 .8 2.6 2.6 0 0 1-.5 5.2H5.5z',
+        }),
+        iconButton({
+          title: t('settings'),
+          onClick: () => setSettingsOpen(true),
+          path: 'M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM8 2.2l.6 1.5 1.6-.4 1 1.3-.9 1.4.9 1.4-1 1.3-1.6-.4-.6 1.5H6.9l-.6-1.5-1.6.4-1-1.3.9-1.4-.9-1.4L4.7 3.3l1.6.4L6.9 2.2z',
+        }),
+        iconButton({
+          title: t('moreActions'),
+          onClick: (event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setMorePos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
+            setMoreOpen(true)
+          },
+          path: '',
+          extra: [
+            E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '3', cx: 12.6, cy: 8, r: 1.1, fill: 'currentColor' }),
+          ],
+        }))
+
       const top = E('div', { className: 'gw-top' },
         E('div', { className: 'gw-pad' },
           error === null ? null : E('div', { className: 'gw-err', key: error },
@@ -2021,6 +2059,7 @@ window.__ModuleLoader__.load({
               'aria-label': t('close'),
               onClick: () => setError(null),
             }, '×')),
+          changeBar,
           E('textarea', {
             className: 'gw-textarea',
             placeholder: t('commitPlaceholder'),
@@ -2128,17 +2167,6 @@ window.__ModuleLoader__.load({
           extra: E('path', { d: 'M3.2 13.4h9.6' }),
         }),
         iconButton({
-          title: treeView === true ? t('flatView') : t('treeView'),
-          active: treeView === true,
-          onClick: () => setTreeView(treeView === false),
-          path: treeView === true ? 'M3 4h10M3 8h10M3 12h10' : 'M4 3v10M4 6h5M4 11h5',
-        }),
-        iconButton({
-          title: t('remotes'),
-          onClick: () => setRemoteOpen(true),
-          path: 'M5.5 12.5a3 3 0 0 1 .3-6 3.8 3.8 0 0 1 7.2 .8 2.6 2.6 0 0 1-.5 5.2H5.5z',
-        }),
-        iconButton({
           title: summary !== null && summary.upstream === null ? t('publish') : t('push'),
           busy: syncBusy === 'push',
           disabled: isRepo === false || syncBusy !== '',
@@ -2150,25 +2178,6 @@ window.__ModuleLoader__.load({
           title: t('refresh'),
           onClick: () => { void refreshAll() },
           path: 'M13 8a5 5 0 1 1-1.5-3.6M13.2 2.6v3.2h-3.2',
-        }),
-        iconButton({
-          title: t('settings'),
-          onClick: () => setSettingsOpen(true),
-          path: 'M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM8 2.2l.6 1.5 1.6-.4 1 1.3-.9 1.4.9 1.4-1 1.3-1.6-.4-.6 1.5H6.9l-.6-1.5-1.6.4-1-1.3.9-1.4-.9-1.4L4.7 3.3l1.6.4L6.9 2.2z',
-        }),
-        iconButton({
-          title: t('moreActions'),
-          onClick: (event) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            setMorePos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
-            setMoreOpen(true)
-          },
-          path: '',
-          extra: [
-            E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
-            E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
-            E('circle', { key: '3', cx: 12.6, cy: 8, r: 1.1, fill: 'currentColor' }),
-          ],
         }))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
