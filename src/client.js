@@ -112,7 +112,7 @@ window.__ModuleLoader__.load({
 .gw-ref-tag, .gw-ref-stash {
   --gw-ref-edge:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag {
-  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
+  background:transparent;
   border-color:var(--gw-ref-edge); }
 .gw-ref-tag .gw-ref-label, .gw-ref-stash .gw-ref-label,
 .gw-ref-tag .gw-ref-kind, .gw-ref-stash .gw-ref-kind,
