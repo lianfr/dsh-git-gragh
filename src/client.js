@@ -87,7 +87,7 @@ window.__ModuleLoader__.load({
 .gw-bar { display:flex; flex-direction:row; align-items:center; gap:6px;
   padding:0 0 8px 0; min-height:30px; flex:none; }
 .gw-bar-title { font-size:14px; font-weight:600; color:var(--dsw-alias-label-primary);
-  margin-right:2px; }
+  padding-left:11px; margin-right:1px; }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
   width:24px; height:24px; padding:0; border:none; border-radius:5px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
