@@ -301,10 +301,141 @@ async function createBranch(payload) {
   return { branch, checkedOut: true }
 }
 
+/* ---------------------------- 远程仓库 ---------------------------- */
+
+/** 远程名：git 允许的字符集里去掉可能被当成选项的形态。 */
+function remoteNameArg(value) {
+  if (typeof value !== 'string') throw new GitError('缺少远程名', 'bad-request', 400)
+  const text = value.trim()
+  if (!/^[A-Za-z0-9._-]+$/.test(text)) {
+    throw new GitError('远程名只能用字母、数字、点、下划线、短横线', 'bad-request', 400)
+  }
+  return text
+}
+
+function remoteUrlArg(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new GitError('缺少远程地址', 'bad-request', 400)
+  }
+  const text = value.trim()
+  if (text.startsWith('-')) throw new GitError('远程地址不能以 - 开头', 'bad-request', 400)
+  return text
+}
+
+async function remotes(payload) {
+  const cwd = requireCwd(payload)
+  const raw = await gitTextQuiet(cwd, ['remote', '-v'])
+  const list = []
+  if (raw !== null) {
+    for (const line of raw.split('\n')) {
+      const match = /^(\S+)\t(.+) \((fetch|push)\)$/.exec(line.trim())
+      if (match === null) continue
+      const label = match[1]
+      let item = null
+      for (const candidate of list) { if (candidate.name === label) item = candidate }
+      if (item === null) { item = { name: label, fetchUrl: '', pushUrl: '' }; list.push(item) }
+      if (match[3] === 'fetch') item.fetchUrl = match[2]
+      else item.pushUrl = match[2]
+    }
+  }
+  return { remotes: list }
+}
+
+async function remoteAdd(payload) {
+  const cwd = requireCwd(payload)
+  const label = remoteNameArg(payload.name)
+  const url = remoteUrlArg(payload.url)
+  await runGit(cwd, ['remote', 'add', label, url])
+  return { name: label, url }
+}
+
+async function remoteSetUrl(payload) {
+  const cwd = requireCwd(payload)
+  const label = remoteNameArg(payload.name)
+  const url = remoteUrlArg(payload.url)
+  await runGit(cwd, ['remote', 'set-url', label, url])
+  return { name: label, url }
+}
+
+async function remoteRename(payload) {
+  const cwd = requireCwd(payload)
+  const from = remoteNameArg(payload.name)
+  const to = remoteNameArg(payload.nextName)
+  await runGit(cwd, ['remote', 'rename', from, to])
+  return { from, to }
+}
+
+async function remoteRemove(payload) {
+  const cwd = requireCwd(payload)
+  const label = remoteNameArg(payload.name)
+  await runGit(cwd, ['remote', 'remove', label])
+  return { name: label }
+}
+
+/* ---------------------------- 远程同步 ---------------------------- */
+
+/** 网络类操作给足时间，但仍设上限：卡在认证提示时不该把面板吊死。 */
+const NETWORK_TIMEOUT_MS = 120_000
+
+async function currentBranchName(cwd) {
+  const text = await gitTextQuiet(cwd, ['symbolic-ref', '--short', '-q', 'HEAD'])
+  if (text === null) return null
+  const value = text.trim()
+  return value === '' ? null : value
+}
+
+async function upstreamOf(cwd) {
+  const text = await gitTextQuiet(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])
+  if (text === null) return null
+  const value = text.trim()
+  return value === '' ? null : value
+}
+
+function failureText(result, fallback) {
+  const text = typeof result.stderr === 'string' ? result.stderr.trim() : ''
+  return text === '' ? fallback : text
+}
+
+async function fetchAll(payload) {
+  const cwd = requireCwd(payload)
+  const result = await runGit(cwd, ['fetch', '--all', '--prune'], {
+    timeoutMs: NETWORK_TIMEOUT_MS,
+    allowNonZero: true,
+  })
+  if (result.code !== 0) throw new GitError(failureText(result, '拉取远程信息失败'), 'fetch-failed', 400)
+  return { ok: true }
+}
+
+async function pull(payload) {
+  const cwd = requireCwd(payload)
+  const upstream = await upstreamOf(cwd)
+  if (upstream === null) throw new GitError('当前分支还没有上游，先推送一次', 'no-upstream', 400)
+  const result = await runGit(cwd, ['pull', '--ff-only'], {
+    timeoutMs: NETWORK_TIMEOUT_MS,
+    allowNonZero: true,
+  })
+  if (result.code !== 0) throw new GitError(failureText(result, '拉取失败'), 'pull-failed', 400)
+  return { upstream }
+}
+
+async function push(payload) {
+  const cwd = requireCwd(payload)
+  const branch = await currentBranchName(cwd)
+  if (branch === null) throw new GitError('当前不在任何分支上，无法推送', 'detached', 400)
+  const upstream = await upstreamOf(cwd)
+  const args = upstream === null ? ['push', '-u', 'origin', branch] : ['push']
+  const result = await runGit(cwd, args, {
+    timeoutMs: NETWORK_TIMEOUT_MS,
+    allowNonZero: true,
+  })
+  if (result.code !== 0) throw new GitError(failureText(result, '推送失败'), 'push-failed', 400)
+  return { branch, published: upstream === null, upstream: upstream === null ? 'origin/' + branch : upstream }
+}
+
 /* ============================== 方法表与 HTTP ============================== */
 
-const READ_METHODS = { summary, log, branches, commitDetail, fileDiff }
-const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch }
+const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes }
+const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 
 function headerOf(req, nameOfHeader) {
