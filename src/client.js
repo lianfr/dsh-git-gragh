@@ -97,16 +97,15 @@ window.__ModuleLoader__.load({
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-row-sep { opacity:.5; }
 
-.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
+.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; box-sizing:border-box;
+  border-radius:4px; border-radius:var(--dsw-radius-xs, 4px); border:1px solid transparent;
+  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); color:var(--gw-ref-ink, #fff);
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
-.gw-ref-branch { background:color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
-  color:var(--dsw-alias-brand-primary); }
-.gw-ref-head { background:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary-inverted); }
-.gw-ref-tag { background:var(--dsw-alias-state-warn-primary); color:var(--dsw-alias-label-primary-inverted); }
+.gw-ref-head { font-weight:600; }
+.gw-ref-remote { border-style:dashed; border-color:var(--gw-ref-ink); }
+.gw-ref-tag { border-style:solid; border-color:var(--gw-ref-ink); }
 .gw-ref-stash { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
-  color:var(--dsw-alias-state-success-primary); }
-.gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
-  color:var(--dsw-alias-label-secondary); }
+  color:var(--dsw-alias-state-success-primary); border-color:transparent; }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
   background:var(--dsw-alias-bg-layer-1);
@@ -316,6 +315,18 @@ window.__ModuleLoader__.load({
 
     function laneColor(lane) {
       return LANE_COLORS[lane % LANE_COLORS.length]
+    }
+
+    function readableOn(hex) {
+      // 八种链色的亮度差得不少，一律配白字会让黄绿那几种糊成一团。
+      // 按感知亮度挑深色或白色字，保证任何链色上文字都清楚。
+      if (typeof hex !== 'string' || hex.length < 7) return '#ffffff'
+      const r = parseInt(hex.slice(1, 3), 16)
+      const g = parseInt(hex.slice(3, 5), 16)
+      const b = parseInt(hex.slice(5, 7), 16)
+      if (!isFinite(r) || !isFinite(g) || !isFinite(b)) return '#ffffff'
+      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+      return lum > 0.6 ? '#141414' : '#ffffff'
     }
 
     function findTrunkTip(entries) {
@@ -620,14 +631,18 @@ window.__ModuleLoader__.load({
       // 注意：props 里不能叫 ref —— React 会把 ref 当特殊属性吞掉，值永远读到 undefined。
       const ref = props.item
       if (!ref || typeof ref !== 'object') return null
-      let cls = 'gw-ref gw-ref-branch'
-      let label = ref.name === undefined ? '' : ref.name
-      if (ref.type === 'head') { cls = 'gw-ref gw-ref-head'; label = ref.name === '' || ref.name === undefined ? 'HEAD' : ref.name }
-      else if (ref.type === 'tag') { cls = 'gw-ref gw-ref-tag'; label = 'tag ' + ref.name }
-      else if (ref.type === 'remote') { cls = 'gw-ref gw-ref-remote' }
-      else if (ref.type === 'stash') { cls = 'gw-ref gw-ref-stash' }
-      return E('span', { className: cls, title: label }, label)
+      const chain = typeof props.color === 'string' && props.color !== '' ? props.color : '#4c9aff'
+      let cls = 'gw-ref'
+      let label = ref.name === undefined || ref.name === null ? '' : String(ref.name)
+      if (ref.type === 'head') { cls += ' gw-ref-head'; if (label === '') label = 'HEAD' }
+      else if (ref.type === 'tag') { cls += ' gw-ref-tag'; label = 'tag ' + label }
+      else if (ref.type === 'remote') { cls += ' gw-ref-remote' }
+      else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
+      else { cls += ' gw-ref-branch' }
+      const style = { '--gw-ref-fill': chain, '--gw-ref-ink': readableOn(chain) }
+      return E('span', { className: cls, style: style, title: label }, label)
     }
+
 
     function FileRow(props) {
       const item = props.item
@@ -711,7 +726,7 @@ window.__ModuleLoader__.load({
         onContextMenu: props.onContextMenu,
         title: entry.subject,
       },
-        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
+        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref, color: props.color })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
         E('span', { className: 'gw-row-meta' },
           E('span', null, entry.author),
@@ -1333,6 +1348,7 @@ window.__ModuleLoader__.load({
                     entry: entry,
                     y: offsets.list[index],
                     laneWidth: laneWidth,
+                    color: laneColor(layout.rowColor[index]),
                     t: t,
                     selected: selected === entry.hash,
                     onClick: entry.uncommitted === true ? null : () => { void selectCommit(entry) },
