@@ -395,9 +395,6 @@ window.__ModuleLoader__.load({
       const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
 
       const laneLast = []
-      // 同一列会被不同时间段的链复用。每复用一次，颜色往后顺延一格，
-      // 这样同一道上相邻的两条链颜色必然不同，不会看着像一条线接下去。
-      const laneUses = []
       const laneOfRow = new Array(entries.length).fill(-1)
 
       const fillRows = (chainIndex) => {
@@ -407,24 +404,34 @@ window.__ModuleLoader__.load({
         }
       }
 
-      // 取色：同一条列上每复用一次就往后顺延一格，且不能和它的父链撞色——
-      // 分叉出来的两条分支颜色必须不同，这是肉眼分辨走向的前提。
-      const pickColor = (lane, fatherColor) => {
-        while (laneUses.length <= lane) laneUses.push(0)
-        let color = lane + laneUses[lane]
-        if (color === fatherColor) color += 1
-        laneUses[lane] = color - lane + 1
-        return color
+      // 取色：颜色和列是两回事。每条链单独领一个颜色槽——从左往右找第一个
+      // 「上次用到行 < 本链起点」的槽，找不到就新开一个，记下本链的结束行。
+      // 所以同一条列上的两条链可以不同色，被让出来的槽也会被后面的链重新领走。
+      // 唯一的附加约束：不能领到父链那个槽，分叉出来的两条分支必须不同色。
+      const colourLast = []
+      const laneColour = []
+      const pickColour = (firstRow, lastRow, lane, fatherSlot) => {
+        const free = (from) => {
+          let slot = from
+          while (slot < colourLast.length && colourLast[slot] >= firstRow) slot += 1
+          return slot
+        }
+        const taken = (slot) => slot === fatherSlot || slot === laneColour[lane]
+        let slot = free(0)
+        while (taken(slot)) slot = free(slot + 1)
+        if (slot >= colourLast.length) colourLast.push(-1)
+        colourLast[slot] = lastRow
+        laneColour[lane] = slot
+        return slot
       }
 
       const takeLane = (chainIndex) => {
         const chain = chains[chainIndex]
         if (chainIndex === trunkChain) {
-          if (laneLast.length === 0) { laneLast.push(chain.last); laneUses.push(0) }
+          if (laneLast.length === 0) laneLast.push(chain.last)
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
-          chain.color = 0
-          laneUses[0] = 1
+          chain.color = pickColour(chain.first, chain.last, 0, -1)
           fillRows(chainIndex)
           return
         }
@@ -441,17 +448,16 @@ window.__ModuleLoader__.load({
         for (let j = start; j < laneLast.length; j++) {
           if (chain.first > laneLast[j]) {
             chain.lane = j
-            chain.color = pickColor(j, fatherColor)
+            chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
             laneLast[j] = chain.last
             fillRows(chainIndex)
             return
           }
         }
-        while (laneLast.length < start) { laneLast.push(-1); laneUses.push(0) }
+        while (laneLast.length < start) laneLast.push(-1)
         laneLast.push(chain.last)
-        laneUses.push(0)
         chain.lane = laneLast.length - 1
-        chain.color = pickColor(chain.lane, fatherColor)
+        chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
         fillRows(chainIndex)
       }
 
