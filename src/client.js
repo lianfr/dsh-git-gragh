@@ -343,17 +343,6 @@ window.__ModuleLoader__.load({
       ].join('\u0000')
     }
 
-    // 带分支、标签或 stash 的提交自成一链，跟 Git Graph 一样各占一条泳道，
-    // 不跟上游挤在同一列里。
-    function hasNamedRef(entry) {
-      if (!Array.isArray(entry.refs)) return false
-      for (const ref of entry.refs) {
-        if (ref.type === 'head' || ref.type === 'branch') return true
-        if (ref.type === 'remote' || ref.type === 'tag' || ref.type === 'stash') return true
-      }
-      return false
-    }
-
     function computeLayout(entries) {
       if (entries.length === 0) return { rowLane: [], laneCount: 1, edges: [], rowOfHash: new Map() }
 
@@ -375,44 +364,57 @@ window.__ModuleLoader__.load({
         guard += 1
       }
 
-      const active = new Map()
-      const rowChain = new Array(entries.length)
-      let nextChain = 0
+      // lanes[j] 是第 j 列正在等待的提交，null 表示这一列空着。
+      // 一列上的活干完就还给别人用，所以一条泳道会先后容纳多条分支。
+      const lanes = []
+      const rowLane = new Array(entries.length)
+
+      const findLane = (hash) => {
+        for (let j = 0; j < lanes.length; j++) if (lanes[j] === hash) return j
+        return -1
+      }
+      const freeLane = (from) => {
+        for (let j = from; j < lanes.length; j++) if (lanes[j] === null) return j
+        while (lanes.length < from) lanes.push(null)
+        lanes.push(null)
+        return lanes.length - 1
+      }
 
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]
-        let chain
+        let myLane = findLane(entry.hash)
         if (trunkSet.has(entry.hash)) {
-          chain = TRUNK
-          active.delete(entry.hash)
-        } else if (hasNamedRef(entry)) {
-          chain = nextChain++
-          active.delete(entry.hash)
-        } else {
-          chain = active.get(entry.hash)
-          if (chain === undefined) {
-            chain = nextChain++
-          } else {
-            active.delete(entry.hash)
+          // 主分支永远占第 0 列，原先占着的人让到别的空位去
+          if (myLane > 0) lanes[myLane] = null
+          if (lanes[0] !== undefined && lanes[0] !== null && lanes[0] !== entry.hash) {
+            lanes[freeLane(1)] = lanes[0]
           }
+          lanes[0] = entry.hash
+          myLane = 0
+        } else if (myLane < 0) {
+          // 第 0 列留给主分支，其余提交从第 1 列起找位置，
+          // 这样从主分支新开出来的分支一定在侧面，不会看着像主线的延伸
+          myLane = freeLane(1)
+          lanes[myLane] = entry.hash
         }
-        rowChain[i] = chain
-        const parents = Array.isArray(entry.parents) ? entry.parents : []
-        const first = parents.length > 0 ? parents[0] : null
-        if (first !== null && !trunkSet.has(first) && !active.has(first)) active.set(first, chain)
-      }
+        rowLane[i] = myLane
+        lanes[myLane] = null
 
-      const laneOfChain = new Map()
-      laneOfChain.set(TRUNK, 0)
-      let nextLane = 1
-      const rowLane = new Array(entries.length)
-      let laneCount = 1
-      for (let i = 0; i < entries.length; i++) {
-        const chain = rowChain[i]
-        let lane = laneOfChain.get(chain)
-        if (lane === undefined) { lane = nextLane++; laneOfChain.set(chain, lane) }
-        rowLane[i] = lane
-        if (lane + 1 > laneCount) laneCount = lane + 1
+        const parents = Array.isArray(entry.parents) ? entry.parents : []
+        for (let p = 0; p < parents.length; p++) {
+          const hash = parents[p]
+          if (!rowOfHash.has(hash)) continue
+          if (p === 0) {
+            lanes[myLane] = hash
+            continue
+          }
+          if (findLane(hash) >= 0) continue
+          // 合并回来的那一支优先落到左侧空位，表现出来就是往左变道
+          let slot = -1
+          for (let j = 0; j < myLane; j++) if (lanes[j] === null) { slot = j; break }
+          if (slot < 0) slot = freeLane(myLane + 1)
+          lanes[slot] = hash
+        }
       }
 
       // 未提交的改动跟它所属的分支同列，不单独占一条泳道
@@ -422,7 +424,8 @@ window.__ModuleLoader__.load({
         const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
         if (row !== undefined) rowLane[i] = rowLane[row]
       }
-      laneCount = 1
+
+      let laneCount = 1
       for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
 
       const edges = []
