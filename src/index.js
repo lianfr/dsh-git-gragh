@@ -146,7 +146,7 @@ async function log(payload) {
   const skip = boundedNumber(payload.skip, 0, 0, 100000)
   const args = ['log', '--date-order', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
   if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
-  else args.push('--all')
+  else args.push('--branches', '--tags', '--remotes', 'HEAD')
 
   let raw = ''
   try {
