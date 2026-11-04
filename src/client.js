@@ -414,6 +414,7 @@ window.__ModuleLoader__.load({
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
           chain.color = 0
+          laneUses[0] += 1
           fillRows(chainIndex)
           return
         }
@@ -440,7 +441,8 @@ window.__ModuleLoader__.load({
         laneLast.push(chain.last)
         laneUses.push(0)
         chain.lane = laneLast.length - 1
-        chain.color = chain.lane
+        chain.color = chain.lane + laneUses[chain.lane]
+        laneUses[chain.lane] += 1
         fillRows(chainIndex)
       }
 
