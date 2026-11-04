@@ -112,7 +112,7 @@ window.__ModuleLoader__.load({
 .gw-ref-remote, .gw-ref-tag, .gw-ref-stash { border-color:var(--dsw-alias-border-l2); }
 .gw-ref-flag { width:5px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
 .gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.4; }
-.gw-ref-label { display:block; min-width:0; padding:0 5px 0 5px; overflow:hidden;
+.gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
   font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary); }
 .gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
@@ -121,7 +121,11 @@ window.__ModuleLoader__.load({
   from { transform:translateX(0); }
   to { transform:translateX(min(0px, calc(-100% + 120px))); }
 }
+.gw-ref-head { border-color:var(--gw-ref-fill); }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
+.gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px;
+  border-left:1px solid var(--dsw-alias-border-l2);
+  font-size:9px; color:var(--dsw-alias-label-tertiary); white-space:nowrap; }
 .gw-ref-remote .gw-ref-label { font-style:italic; }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
@@ -634,6 +638,40 @@ window.__ModuleLoader__.load({
     /* pieces                                                              */
     /* ------------------------------------------------------------------ */
 
+    function groupRefs(refs) {
+      // 同一提交上，远程分支去掉远程名后若能与本地同名分支对上，就并进那个标签，
+      // 对不上的远程才单独成标签。判断方式与 VSCode Git Graph 一致。
+      const heads = []
+      const rest = []
+      const byName = new Map()
+      for (const ref of refs) {
+        if (ref.type === 'head' || ref.type === 'branch') {
+          const item = { ref: ref, remotes: [] }
+          heads.push(item)
+          if (typeof ref.name === 'string') byName.set(ref.name, item)
+        } else {
+          rest.push(ref)
+        }
+      }
+      const pending = []
+      for (const ref of rest) {
+        if (ref.type === 'remote' && typeof ref.name === 'string') {
+          const slash = ref.name.indexOf('/')
+          if (slash > 0) {
+            const remoteName = ref.name.slice(0, slash)
+            const target = byName.get(ref.name.slice(slash + 1))
+            if (target !== undefined) {
+              target.remotes.push(remoteName)
+              continue
+            }
+          }
+        }
+        pending.push(ref)
+      }
+      heads.sort((a, b) => (a.ref.type === 'head' ? -1 : 0) - (b.ref.type === 'head' ? -1 : 0))
+      return { heads: heads, rest: pending }
+    }
+
     function RefBadge(props) {
       // 注意：props 里不能叫 ref —— React 会把 ref 当特殊属性吞掉，值永远读到 undefined。
       const ref = props.item
@@ -648,7 +686,10 @@ window.__ModuleLoader__.load({
       else { cls += ' gw-ref-branch' }
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
-        E('span', { className: 'gw-ref-label' }, E('span', { className: 'gw-ref-text' }, label)))
+        E('span', { className: 'gw-ref-label' }, E('span', { className: 'gw-ref-text' }, label)),
+        Array.isArray(props.remotes) && props.remotes.length > 0
+          ? E('span', { className: 'gw-ref-remotes' }, props.remotes.join(' '))
+          : null)
     }
 
 
@@ -720,6 +761,7 @@ window.__ModuleLoader__.load({
       const y = props.y
       const t = props.t
       const refs = Array.isArray(entry.refs) ? entry.refs : []
+      const grouped = groupRefs(refs)
       if (entry.uncommitted === true) {
         return E('div', {
           className: 'gw-row gw-row-ghost',
@@ -735,7 +777,10 @@ window.__ModuleLoader__.load({
         onContextMenu: props.onContextMenu,
         title: entry.subject,
       },
-        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref, color: props.color })),
+        grouped.heads.map((head, index) => E(RefBadge, {
+          key: 'h' + String(index), item: head.ref, color: props.color, remotes: head.remotes,
+        })),
+        grouped.rest.map((ref, index) => E(RefBadge, { key: 'o' + String(index), item: ref, color: props.color })),
         E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)),
         E('span', { className: 'gw-row-meta' },
           E('span', null, entry.author),
