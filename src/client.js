@@ -354,7 +354,18 @@ window.__ModuleLoader__.load({
       let trunkTip = findTrunkTip(entries)
       if (trunkTip === null) trunkTip = entries[0].hash
 
-      // 一、切链：每行沿第一父往下走，撞到已经有主的提交就停。
+      // 哪些提交是某个分支的尖端——链在这些地方必须断开，
+      // 否则从 main 新开的分支会顺着第一父一路并进 main 那条线，看着是一根直线。
+      const isTip = new Array(entries.length).fill(false)
+      for (let i = 0; i < entries.length; i++) {
+        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+        for (let r = 0; r < refs.length; r++) {
+          const type = refs[r] && refs[r].type
+          if (type === 'branch' || type === 'remote' || type === 'head') { isTip[i] = true; break }
+        }
+      }
+
+      // 一、切链：每行沿第一父往下走，撞到已经有主的提交、或撞到别的分支尖端就停。
       // 一条链就是图上一段连续画下来的线，链内不会断开。
       const chainOf = new Array(entries.length).fill(-1)
       const chains = []
@@ -369,6 +380,7 @@ window.__ModuleLoader__.load({
           if (parents.length === 0) break
           const next = rowOfHash.get(parents[0])
           if (next === undefined || next <= row) break
+          if (isTip[next]) break
           row = next
         }
         chains.push(chain)
@@ -419,6 +431,20 @@ window.__ModuleLoader__.load({
         const chain = chains[chainOf[i]]
         rowLane[i] = chain.lane
         rowColor[i] = chain.color
+      }
+
+      // stash 只是暂存区快照，跟着它所在的那条分支走，不单独占道
+      for (let i = 0; i < entries.length; i++) {
+        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+        let stashed = false
+        for (let r = 0; r < refs.length; r++) if (refs[r] && refs[r].type === 'stash') { stashed = true; break }
+        if (!stashed) continue
+        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
+        if (row !== undefined) {
+          rowLane[i] = rowLane[row]
+          rowColor[i] = rowColor[row]
+        }
       }
 
       // 未提交的改动跟它所属的分支同列同色，不单独占道
