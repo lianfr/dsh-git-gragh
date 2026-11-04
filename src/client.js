@@ -901,6 +901,14 @@ window.__ModuleLoader__.load({
       }, [entries, selected])
 
       const svgHeight = offsets.total
+      // 抽屉展开的那一行在列表里的下标，用于判断某条连线是否跨过抽屉区间
+      const selectedIndex = useMemo(() => {
+        if (selected === null) return -1
+        for (let i = 0; i < entries.length; i++) {
+          if (entries[i].hash === selected) return i
+        }
+        return -1
+      }, [selected, entries])
       const drawerTop = useMemo(() => {
         if (selected === null) return 0
         for (let i = 0; i < entries.length; i++) {
@@ -1038,10 +1046,19 @@ window.__ModuleLoader__.load({
                       const y2 = offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
-                      const mid = (y1 + y2) / 2
-                      const d = Math.abs(x1 - x2) < 0.5
-                        ? 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2
-                        : 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                      let d
+                      if (Math.abs(x1 - x2) < 0.5) {
+                        d = 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2
+                      } else if (selectedIndex >= 0 && edge.from <= selectedIndex && edge.to > selectedIndex) {
+                        // 跨抽屉的边：换道收在抽屉上沿之前完成，抽屉区间内保持竖直，
+                        // 避免长距离缓坡斜穿整个详情块
+                        const mid = (y1 + drawerTop) / 2
+                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + drawerTop
+                          + ' L' + x2 + ',' + y2
+                      } else {
+                        const mid = (y1 + y2) / 2
+                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                      }
                       return E('path', {
                         key: 'e' + String(index),
                         d: d,
