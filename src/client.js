@@ -1186,8 +1186,14 @@ window.__ModuleLoader__.load({
                         d = 'M' + x1 + ',' + y1 + ' L' + x1 + ',' + bottom
                           + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
                       } else {
-                        const mid = (y1 + y2) / 2
-                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                        // 换道收在起点下方一行之内，之后竖直跑到父提交。
+                        // 全程渐变会让长边斜穿中间好几行，看着像一根歪线。
+                        const span = y2 - y1
+                        const gap = Math.min(ROW_H * 0.7, span * 0.45)
+                        d = 'M' + x1 + ',' + y1
+                          + ' L' + x1 + ',' + (y1 + gap * 0.35)
+                          + ' C' + x1 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 1.35)
+                          + ' L' + x2 + ',' + y2
                       }
                       return E('path', {
                         key: 'e' + String(index),
