@@ -237,6 +237,12 @@ window.__ModuleLoader__.load({
 .gw-menu-item { display:flex; align-items:center; height:26px; padding:0 10px; border-radius:5px;
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
 .gw-menu-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-note { font-size:11.5px; line-height:1.6; color:var(--dsw-alias-label-secondary);
+  margin-bottom:8px; white-space:pre-wrap; }
+.gw-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
+.gw-btn-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 85%, #000); }
+.gw-menu-danger { color:var(--dsw-alias-state-error-primary); }
+.gw-menu-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent); }
 .gw-menu-sep { height:1px; margin:4px 6px; background:var(--dsw-alias-border-l1); }
 .gw-scrim { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.32);
   display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -328,8 +334,22 @@ window.__ModuleLoader__.load({
         noRepo: '当前工作目录不是 Git 仓库',
         loading: '加载中…',
         files: '个文件',
+        addTag: '新建标签…',
+        cherryPickHere: '拣选此提交…',
+        revertHere: '撤销此提交…',
+        dropHere: '丢弃此提交…',
+        mergeIntoCurrent: '合并进当前分支…',
+        rebaseOntoHere: '把当前分支变基到此提交…',
+        resetToHere: '把当前分支重置到此提交…',
+        pickHint: '双击检出',
         copyHash: '复制完整哈希',
         copySubject: '复制提交信息',
+        save: '保存',
+        ok: '确定',
+        revertNote: '会新建一个提交来抵消「{subject}」的改动。',
+        dropNote: '「{subject}」将从历史里移除，之后所有提交的哈希都会变。',
+        rebaseNote: '当前分支的提交会接到这个提交之后，历史会被改写。',
+        resetNote: '当前分支会退到这个提交，工作区与暂存区的改动都会丢失。',
         checkoutHere: '检出到此提交',
         branchHere: '在此新建分支',
         branchPrompt: '新分支名称',
@@ -388,8 +408,22 @@ window.__ModuleLoader__.load({
         noRepo: 'Current directory is not a Git repository',
         loading: 'Loading…',
         files: 'files',
+        addTag: 'Add tag…',
+        cherryPickHere: 'Cherry-pick this commit…',
+        revertHere: 'Revert this commit…',
+        dropHere: 'Drop this commit…',
+        mergeIntoCurrent: 'Merge into current branch…',
+        rebaseOntoHere: 'Rebase current branch onto this…',
+        resetToHere: 'Reset current branch to this…',
+        pickHint: 'double-click to check out',
         copyHash: 'Copy full hash',
         copySubject: 'Copy commit message',
+        save: 'Save',
+        ok: 'OK',
+        revertNote: 'Creates a new commit undoing "{subject}".',
+        dropNote: '"{subject}" will be removed from history; later hashes change.',
+        rebaseNote: 'Current branch commits will be replayed onto this commit.',
+        resetNote: 'Current branch moves to this commit; local changes are lost.',
         checkoutHere: 'Checkout this commit',
         branchHere: 'New branch here',
         branchPrompt: 'New branch name',
@@ -826,7 +860,15 @@ window.__ModuleLoader__.load({
       const shift = Math.max(0, textWidth - visible)
       const seconds = shift === 0 ? 0 : Math.max(0.8, shift / 24)
       if (hasRemotes) cls += ' gw-ref-linked'
-      return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
+      const pick = typeof props.onPick === 'function' && (ref.type === 'branch' || ref.type === 'remote' || ref.type === 'tag')
+        ? (event) => { event.stopPropagation(); props.onPick(ref) }
+        : undefined
+      return E('span', {
+        className: cls,
+        style: { '--gw-ref-fill': chain },
+        title: pick === undefined ? label : label + ' · ' + props.pickHint,
+        onDoubleClick: pick,
+      },
         E('span', { className: 'gw-ref-flag' }),
         ref.type === 'tag' ? E('span', { className: 'gw-ref-kind' }, '⚑') : null,
         E('span', { className: 'gw-ref-label' },
@@ -996,8 +1038,12 @@ window.__ModuleLoader__.load({
       },
         grouped.heads.map((head, index) => E(RefBadge, {
           key: 'h' + String(index), item: head.ref, color: props.color, remotes: head.remotes,
+          onPick: props.onRefPick, pickHint: props.pickHint,
         })),
-        grouped.rest.map((ref, index) => E(RefBadge, { key: 'o' + String(index), item: ref, color: props.color })),
+        grouped.rest.map((ref, index) => E(RefBadge, {
+          key: 'o' + String(index), item: ref, color: props.color,
+          onPick: props.onRefPick, pickHint: props.pickHint,
+        })),
         E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)),
         E('span', { className: 'gw-row-meta' },
           E('span', null, entry.author),
@@ -1073,6 +1119,39 @@ window.__ModuleLoader__.load({
     /* context menu                                                        */
     /* ------------------------------------------------------------------ */
 
+    /** 右键菜单里那些需要补一句或确认一次的动作，共用这一个对话框。 */
+    function AskDialog(props) {
+      const t = props.t
+      const [value, setValue] = useState(props.initial === undefined ? '' : props.initial)
+
+      return E('div', {
+        className: 'gw-scrim',
+        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onCancel() },
+      },
+        E('div', { className: 'gw-card' },
+          E('div', { className: 'gw-card-head' }, E('span', { className: 'gw-card-title' }, props.title)),
+          E('div', { className: 'gw-card-body' },
+            props.message === undefined ? null : E('div', { className: 'gw-note' }, props.message),
+            props.input === true ? E('input', {
+              className: 'gw-input',
+              autoFocus: true,
+              value: value,
+              onChange: (event) => setValue(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter' && value.trim() !== '') props.onOk(value.trim())
+              },
+            }) : null),
+          E('div', { className: 'gw-card-foot' },
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: props.onCancel,
+            }, t('cancel')),
+            E('button', {
+              className: 'gw-btn gw-btn-sm' + (props.danger === true ? ' gw-btn-danger' : ' gw-btn-primary'),
+              onClick: () => props.onOk(value.trim()),
+            }, props.confirmLabel === undefined ? t('ok') : props.confirmLabel))))
+    }
+
     function ContextMenu(props) {
       const t = props.t
       const entry = props.entry
@@ -1112,12 +1191,27 @@ window.__ModuleLoader__.load({
         props.onClose()
       }
 
+      const item = (label, run, tone) => E('div', {
+        className: 'gw-menu-item' + (tone === undefined ? '' : ' gw-menu-' + tone),
+        onClick: run,
+      }, label)
+      const act = (kind) => () => { props.onClose(); props.onAction(kind, entry) }
+
       return E('div', { ref: ref, className: 'gw-menu', style: { left: pos.left + 'px', top: pos.top + 'px' } },
-        E('div', { className: 'gw-menu-item', onClick: () => copy(entry.hash) }, t('copyHash')),
-        E('div', { className: 'gw-menu-item', onClick: () => copy(entry.subject) }, t('copySubject')),
+        item(t('addTag'), act('tag')),
+        item(t('branchHere'), act('branch')),
         E('div', { className: 'gw-menu-sep' }),
-        E('div', { className: 'gw-menu-item', onClick: () => { props.onClose(); props.onCheckout(entry) } }, t('checkoutHere')),
-        E('div', { className: 'gw-menu-item', onClick: () => { props.onClose(); props.onBranch(entry) } }, t('branchHere')))
+        item(t('checkoutHere'), act('checkout')),
+        item(t('cherryPickHere'), act('cherryPick')),
+        item(t('revertHere'), act('revert')),
+        item(t('dropHere'), act('drop'), 'danger'),
+        E('div', { className: 'gw-menu-sep' }),
+        item(t('mergeIntoCurrent'), act('merge')),
+        item(t('rebaseOntoHere'), act('rebase')),
+        item(t('resetToHere'), act('reset')),
+        E('div', { className: 'gw-menu-sep' }),
+        item(t('copyHash'), () => copy(entry.hash)),
+        item(t('copySubject'), () => copy(entry.subject)))
     }
 
     /* ------------------------------------------------------------------ */
@@ -1153,6 +1247,7 @@ window.__ModuleLoader__.load({
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
+      const [ask, setAsk] = useState(null)
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
       const [menu, setMenu] = useState(null)
@@ -1542,19 +1637,95 @@ window.__ModuleLoader__.load({
 
       const onCheckout = useCallback((entry) => {
         void run(async () => {
-          await api('checkout', { cwd: cwd, ref: entry.hash, detach: true })
+          await api('checkout', { cwd: cwd, target: entry.hash, detach: true })
           await refreshAll()
         })
       }, [cwd, run, refreshAll])
 
       const onBranch = useCallback((entry) => {
-        const name = window.prompt(t('branchPrompt'), '')
-        if (name === null || name.trim() === '') return
-        void run(async () => {
-          await api('createBranch', { cwd: cwd, name: name.trim(), startPoint: entry.hash, checkout: true })
-          await refreshAll()
+        setAsk({
+          title: t('branchHere'), input: true, initial: '', confirmLabel: t('save'),
+          run: (value) => {
+            if (value === '') return
+            void run(async () => {
+              await api('createBranch', { cwd: cwd, name: value, startPoint: entry.hash, checkout: true })
+              await refreshAll()
+            })
+          },
         })
       }, [cwd, run, refreshAll, t])
+
+      /** 双击标签检出：分支直接切，远程取同名的本地分支，标签走分离头。 */
+      const onRefPick = useCallback((ref) => {
+        let target = null
+        let detach = false
+        if (ref.type === 'branch') target = ref.name
+        else if (ref.type === 'tag') { target = ref.name; detach = true }
+        else if (ref.type === 'remote') target = ref.name.split('/').slice(1).join('/')
+        if (target === null || target === '') return
+        void run(async () => {
+          await api('checkout', { cwd: cwd, target: target, detach: detach })
+          await refreshAll()
+        })
+      }, [cwd, run, refreshAll])
+
+      /** 提交行的右键动作：需要补参数的先弹一句，需要确认的先问一次。 */
+      const onCommitAction = useCallback((kind, entry) => {
+        const perform = (method, extra) => () => {
+          void run(async () => {
+            await api(method, Object.assign({ cwd: cwd, hash: entry.hash }, extra))
+            await refreshAll()
+          })
+        }
+        if (kind === 'tag') {
+          setAsk({
+            title: t('addTag'), input: true, initial: '', confirmLabel: t('save'),
+            run: (value) => { if (value !== '') perform('tagCreate', { name: value })() },
+          })
+          return
+        }
+        if (kind === 'branch') { onBranch(entry); return }
+        if (kind === 'checkout') { onCheckout(entry); return }
+        if (kind === 'cherryPick') { perform('cherryPick')(); return }
+        if (kind === 'merge') { perform('mergeCommit')(); return }
+        if (kind === 'revert') {
+          setAsk({
+            title: t('revertHere'),
+            message: t('revertNote', { subject: entry.subject }),
+            confirmLabel: t('ok'),
+            run: perform('revertCommit'),
+          })
+          return
+        }
+        if (kind === 'drop') {
+          setAsk({
+            title: t('dropHere'),
+            message: t('dropNote', { subject: entry.subject }),
+            danger: true,
+            confirmLabel: t('dropHere'),
+            run: perform('dropCommit', { confirm: true }),
+          })
+          return
+        }
+        if (kind === 'rebase') {
+          setAsk({
+            title: t('rebaseOntoHere'),
+            message: t('rebaseNote'),
+            confirmLabel: t('ok'),
+            run: perform('rebaseOnto'),
+          })
+          return
+        }
+        if (kind === 'reset') {
+          setAsk({
+            title: t('resetToHere'),
+            message: t('resetNote'),
+            danger: true,
+            confirmLabel: t('ok'),
+            run: perform('resetTo', { mode: 'hard', confirm: true }),
+          })
+        }
+      }, [cwd, run, refreshAll, t, onBranch, onCheckout])
 
       if (cwd === '') {
         return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
@@ -1780,6 +1951,8 @@ window.__ModuleLoader__.load({
                     laneWidth: laneWidth,
                     color: laneColor(layout.rowColor[index]),
                     t: t,
+                    onRefPick: onRefPick,
+                    pickHint: t('pickHint'),
                     selected: selected === entry.hash,
                     onClick: entry.uncommitted === true ? null : () => { void selectCommit(entry) },
                     onContextMenu: entry.uncommitted === true ? null : (event) => {
@@ -1810,8 +1983,7 @@ window.__ModuleLoader__.load({
           y: menu.y,
           entry: menu.entry,
           onClose: () => setMenu(null),
-          onCheckout: onCheckout,
-          onBranch: onBranch,
+          onAction: onCommitAction,
         }),
         moreOpen === false ? null : E('div', {
           className: 'gw-scrim',
@@ -1828,6 +2000,17 @@ window.__ModuleLoader__.load({
             }, t('remotes')),
             E('div', { className: 'gw-menu-sep' }),
             E('div', { className: 'gw-menu-item' }, t('openInTerminal')))),
+        ask === null ? null : E(AskDialog, {
+          t: t,
+          title: ask.title,
+          message: ask.message,
+          input: ask.input === true,
+          initial: ask.initial,
+          danger: ask.danger === true,
+          confirmLabel: ask.confirmLabel,
+          onCancel: () => setAsk(null),
+          onOk: (value) => { const run = ask.run; setAsk(null); run(value) },
+        }),
         remoteOpen === false ? null : E(RemoteDialog, {
           t: t,
           list: remoteList,
