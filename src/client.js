@@ -98,7 +98,7 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary); }
 
 .gw-drawer { position:absolute; right:0; background:var(--dsw-alias-bg-layer-1);
-  border-top:1px solid var(--dsw-alias-border-l2); border-bottom:1px solid var(--dsw-alias-border-l2);
+  border-bottom:1px solid var(--dsw-alias-border-l2);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
 .gw-detail-msg { white-space:pre-wrap; font-size:12px; margin:0 0 8px; color:var(--dsw-alias-label-primary); }
