@@ -1202,7 +1202,7 @@ window.__ModuleLoader__.load({
                         key: 'e' + String(index),
                         d: d,
                         fill: 'none',
-                        stroke: laneColor(edge.fromLane),
+                        stroke: laneColor(edge.primary ? edge.fromLane : edge.toLane),
                         strokeWidth: edge.primary ? 1.6 : 1.2,
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
