@@ -364,58 +364,58 @@ window.__ModuleLoader__.load({
         guard += 1
       }
 
-      // lanes[j] 是第 j 列正在等待的提交，null 表示这一列空着。
-      // 一列上的活干完就还给别人用，所以一条泳道会先后容纳多条分支。
-      const lanes = []
-      const rowLane = new Array(entries.length)
-
-      const findLane = (hash) => {
-        for (let j = 0; j < lanes.length; j++) if (lanes[j] === hash) return j
-        return -1
-      }
-      const freeLane = (from) => {
-        for (let j = from; j < lanes.length; j++) if (lanes[j] === null) return j
-        while (lanes.length < from) lanes.push(null)
-        lanes.push(null)
-        return lanes.length - 1
-      }
-
+      // 先按第一父链把提交切成一条条链，再按链实际占用的行区间分配泳道。
+      // 区间不重叠的两条链可以共用一列，所以一条泳道会先后容纳多条分支，
+      // 不会出现「一个分支一道」把图铺满的情况。
+      const activeChain = new Map()
+      const rowChain = new Array(entries.length)
+      let nextChain = 0
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]
-        let myLane = findLane(entry.hash)
+        let chain
         if (trunkSet.has(entry.hash)) {
-          // 主分支永远占第 0 列，原先占着的人让到别的空位去
-          if (myLane > 0) lanes[myLane] = null
-          if (lanes[0] !== undefined && lanes[0] !== null && lanes[0] !== entry.hash) {
-            lanes[freeLane(1)] = lanes[0]
-          }
-          lanes[0] = entry.hash
-          myLane = 0
-        } else if (myLane < 0) {
-          // 第 0 列留给主分支，其余提交从第 1 列起找位置，
-          // 这样从主分支新开出来的分支一定在侧面，不会看着像主线的延伸
-          myLane = freeLane(1)
-          lanes[myLane] = entry.hash
+          chain = -1
+          activeChain.delete(entry.hash)
+        } else {
+          chain = activeChain.get(entry.hash)
+          if (chain === undefined) chain = nextChain++
+          else activeChain.delete(entry.hash)
         }
-        rowLane[i] = myLane
-        lanes[myLane] = null
-
+        rowChain[i] = chain
         const parents = Array.isArray(entry.parents) ? entry.parents : []
-        for (let p = 0; p < parents.length; p++) {
-          const hash = parents[p]
-          if (!rowOfHash.has(hash)) continue
-          if (p === 0) {
-            lanes[myLane] = hash
-            continue
-          }
-          if (findLane(hash) >= 0) continue
-          // 合并回来的那一支优先落到左侧空位，表现出来就是往左变道
-          let slot = -1
-          for (let j = 0; j < myLane; j++) if (lanes[j] === null) { slot = j; break }
-          if (slot < 0) slot = freeLane(myLane + 1)
-          lanes[slot] = hash
-        }
+        const first = parents.length > 0 ? parents[0] : null
+        if (first !== null && !trunkSet.has(first) && !activeChain.has(first)) activeChain.set(first, chain)
       }
+
+      const chainRows = new Map()
+      for (let i = 0; i < entries.length; i++) {
+        const key = rowChain[i]
+        const rows = chainRows.get(key)
+        if (rows === undefined) chainRows.set(key, [i])
+        else rows.push(i)
+      }
+
+      const laneOfChain = new Map()
+      laneOfChain.set(-1, 0)
+      // 第 0 列归主分支：先把所有行都占上，任何链都抢不到它
+      const laneRows = [new Set(entries.map((entry, index) => index))]
+      const chains = Array.from(chainRows.keys()).filter((key) => key !== -1)
+      chains.sort((a, b) => chainRows.get(a)[0] - chainRows.get(b)[0])
+      for (const key of chains) {
+        const rows = chainRows.get(key)
+        let lane = -1
+        for (let j = 1; j < laneRows.length; j++) {
+          let clash = false
+          for (const row of rows) if (laneRows[j].has(row)) { clash = true; break }
+          if (!clash) { lane = j; break }
+        }
+        if (lane < 0) { lane = laneRows.length; laneRows.push(new Set()) }
+        for (const row of rows) laneRows[lane].add(row)
+        laneOfChain.set(key, lane)
+      }
+
+      const rowLane = new Array(entries.length)
+      for (let i = 0; i < entries.length; i++) rowLane[i] = laneOfChain.get(rowChain[i])
 
       // 未提交的改动跟它所属的分支同列，不单独占一条泳道
       for (let i = 0; i < entries.length; i++) {
