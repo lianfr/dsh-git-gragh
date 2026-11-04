@@ -8,6 +8,7 @@ window.__ModuleLoader__.load({
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
+  const POLL_MS = 3000
     const ROW_H = 24
     const LANE_W = 14
     const DRAWER_H = 300
@@ -317,6 +318,17 @@ window.__ModuleLoader__.load({
         }
       }
       return null
+    }
+
+    function signatureOf(view) {
+      if (view === null) return ''
+      const counts = view.counts || {}
+      const list = Array.isArray(view.changes) ? view.changes : []
+      return [
+        view.branch, view.head, view.ahead, view.behind,
+        counts.staged, counts.unstaged, counts.untracked, counts.conflicted,
+        list.map((item) => item.path + item.index + item.worktree).join('\u0001'),
+      ].join('\u0000')
     }
 
     function computeLayout(entries) {
@@ -712,6 +724,7 @@ window.__ModuleLoader__.load({
       const [openGroups, setOpenGroups] = useState({ conflicts: true, staged: true, changes: true, untracked: true })
 
       const aliveRef = useRef(true)
+      const lastSigRef = useRef(null)
       useEffect(() => {
         aliveRef.current = true
         return () => { aliveRef.current = false }
@@ -721,7 +734,10 @@ window.__ModuleLoader__.load({
         if (cwd === '') return null
         try {
           const data = await api('summary', { cwd: cwd })
-          if (aliveRef.current) { setSummary(data); setError(null) }
+          if (aliveRef.current) {
+            setSummary(data)
+            setError(null)
+          }
           return data
         } catch (failure) {
           if (aliveRef.current) setError(failure.message)
@@ -743,7 +759,8 @@ window.__ModuleLoader__.load({
       }, [cwd])
 
       const refreshAll = useCallback(async () => {
-        await Promise.all([refreshSummary(), refreshLog()])
+        const [view] = await Promise.all([refreshSummary(), refreshLog()])
+        lastSigRef.current = signatureOf(view)
       }, [refreshSummary, refreshLog])
 
       // 只在切换仓库时清空视图；可见性变化只负责重新拉取，避免同一次挂载发起两轮请求。
@@ -759,6 +776,22 @@ window.__ModuleLoader__.load({
         if (props.visible === false) return
         void refreshAll()
       }, [cwd, props.visible, refreshAll])
+
+      // 外部操作（终端、编辑器、其他 agent）不会通知面板，靠轮询 summary 的签名变化触发重拉。
+      useEffect(() => {
+        if (props.visible === false || cwd === '') return undefined
+        let stopped = false
+        const timer = setInterval(async () => {
+          if (stopped) return
+          const view = await refreshSummary()
+          if (stopped || view === null) return
+          const signature = signatureOf(view)
+          if (signature === lastSigRef.current) return
+          lastSigRef.current = signature
+          await refreshLog()
+        }, POLL_MS)
+        return () => { stopped = true; clearInterval(timer) }
+      }, [cwd, props.visible, refreshSummary, refreshLog])
 
       const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore || cwd === '') return

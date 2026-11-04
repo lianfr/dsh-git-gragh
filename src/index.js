@@ -112,11 +112,18 @@ async function summary(payload) {
     }
   }
 
+  let head = null
+  if (!isEmpty) {
+    const headText = await gitTextQuiet(root, ['rev-parse', 'HEAD'])
+    if (headText !== null && headText.trim() !== '') head = headText.trim()
+  }
+
   const changes = await readChanges(root)
   return {
     isRepo: true,
     cwd,
     root,
+    head,
     branch,
     detached: branch === 'HEAD',
     empty: isEmpty,
