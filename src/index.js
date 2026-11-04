@@ -17,7 +17,6 @@ import path from 'node:path'
 
 import { GitError, gitText, gitTextQuiet, messageOf, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
-import { computeLayout } from './graph-layout.js'
 
 export const name = 'dsh-git-workbench'
 export const inject = ['webServer']
@@ -189,77 +188,6 @@ async function log(payload) {
  */
 const MAX_GRAPH_COMMITS = 20000
 
-async function graph(payload) {
-  const cwd = requireCwd(payload)
-  const limit = boundedNumber(payload.limit, 100, 1, 500)
-  const skip = boundedNumber(payload.skip, 0, 0, 100000)
-  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(MAX_GRAPH_COMMITS)]
-  if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
-  else {
-    args.push('--branches', '--tags', '--remotes', 'HEAD')
-    const stashRef = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
-    if (stashRef !== null && stashRef.trim() !== '') args.push('refs/stash')
-  }
-
-  let raw = ''
-  try {
-    raw = await gitText(cwd, args)
-  } catch (error) {
-    if (/does not have any commits|unknown revision|bad revision/i.test(messageOf(error))) {
-      return { entries: [], edges: [], laneCount: 1, hasMore: false }
-    }
-    throw error
-  }
-
-  const all = parseLog(raw).filter((entry) => !/^index on /.test(entry.subject))
-  const truncated = all.length >= MAX_GRAPH_COMMITS
-  /* 布局在完整前缀上算；注意这一步用的是 all，不是窗口。 */
-  const layout = computeLayout(all)
-
-  const end = skip + limit
-  const entries = []
-  for (let i = skip; i < all.length && i < end; i++) {
-    entries.push(Object.assign({}, all[i], {
-      lane: layout.rowLane[i],
-      color: layout.rowColor[i],
-    }))
-  }
-
-  /* 只回传落在窗口内的连线，下标换算成相对窗口的位置。
-   * 父提交在窗口之外时照样回传，标成 dangling：前端据此画一条延伸到画布底部的
-   * 竖线，读者能看出这条链还没结束，而不是以为线断了。 */
-  const edges = []
-  for (const edge of layout.edges) {
-    if (edge.from < skip || edge.from >= end) continue
-    const to = edge.to - skip
-    if (to < 0) continue
-    /* 只让第一父悬空：第二父找不到时画一条到底部的线会误导读者以为那是主线，
-     * Git Graph 也是只对第一父接虚拟顶点。 */
-    if (to >= entries.length && edge.primary === true) {
-      edges.push(Object.assign({}, edge, {
-        from: edge.from - skip,
-        to: entries.length,
-        fromHash: all[edge.from].hash,
-        toHash: null,
-        dangling: true,
-      }))
-      continue
-    }
-    edges.push(Object.assign({}, edge, {
-      from: edge.from - skip,
-      to: to,
-      fromHash: all[edge.from].hash,
-      toHash: all[edge.to].hash,
-    }))
-  }
-
-  return {
-    entries: entries,
-    edges: edges,
-    laneCount: layout.laneCount,
-    hasMore: all.length > end || truncated,
-  }
-}
 
 async function branches(payload) {
   const cwd = requireCwd(payload)
@@ -627,7 +555,7 @@ async function push(payload) {
 
 /* ============================== 方法表与 HTTP ============================== */
 
-const READ_METHODS = { summary, log, graph, branches, commitDetail, fileDiff, remotes }
+const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes }
 const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit, ignore }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 

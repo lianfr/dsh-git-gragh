@@ -34,7 +34,6 @@
     "src/git-run.js",
     "src/git-parse.js",
     "src/client.js",
-    "src/graph-layout.js",
     "cordis.patch.yml",
     "dsh.plugin.json",
     "README.md"

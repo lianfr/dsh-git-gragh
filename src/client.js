@@ -778,6 +778,165 @@ window.__ModuleLoader__.load({
     /* pieces                                                              */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * 找出主干（main / master / origin 默认分支 / 当前分支）所在的提交行。
+     * 主干永远占第 0 列。
+     */
+    function findTrunkIndex(entries) {
+      const named = ['main', 'master']
+      for (const wanted of named) {
+        for (let i = 0; i < entries.length; i++) {
+          const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+          for (const ref of refs) {
+            if (ref.type === 'branch' && ref.name === wanted) return i
+          }
+        }
+      }
+      for (let i = 0; i < entries.length; i++) {
+        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+        for (const ref of refs) {
+          if (ref.type === 'head') return i
+        }
+      }
+      return 0
+    }
+
+    /**
+     * 逐行游标分配泳道。
+     *
+     * 和 Git Graph 一样，第 i 行只用第 0..i-1 行的结果来决定，不回头看下方数据——
+     * 所以只加载最近一百条算出来的列，和加载全量算出来的完全一致，翻页时前段不会跳。
+     *
+     * 与它不同的两处，是为了满足我们的规则：
+     * ① 先给每个提交打上「属于哪个分支」的标记（从分支尖端沿第一父往下走），
+     *    主干锁死第 0 列；别的分支各占一列，紧挨着上一条分支结尾的不许复用它的列，
+     *    否则两者首尾相接，看上去就是一条直线。
+     * ② 列可以复用，但复用时颜色必须换掉，同一列相邻两段不会同色。
+     */
+    function computeLanes(entries) {
+      const count = entries.length
+      const indexOf = new Map()
+      for (let i = 0; i < count; i++) indexOf.set(entries[i].hash, i)
+
+      const trunk = count === 0 ? 0 : findTrunkIndex(entries)
+
+      /* 第一遍：从每个分支尖端沿第一父往下走，标记「这段属于谁」。 */
+      const owner = new Array(count).fill(-1)
+      const tips = [trunk]
+      for (let i = 0; i < count; i++) {
+        if (i === trunk) continue
+        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+        let isTip = false
+        for (const ref of refs) {
+          if (ref.type === 'branch' || ref.type === 'remote' || ref.type === 'tag' || ref.type === 'stash') { isTip = true; break }
+        }
+        if (isTip === true) tips.push(i)
+      }
+      for (const tip of tips) {
+        let cursor = tip
+        while (cursor >= 0 && cursor < count && owner[cursor] < 0) {
+          owner[cursor] = tip
+          const parents = Array.isArray(entries[cursor].parents) ? entries[cursor].parents : []
+          if (parents.length === 0) break
+          const next = indexOf.get(parents[0])
+          cursor = next === undefined ? -1 : next
+        }
+      }
+      /* 没被任何尖端链覆盖到的（比如未提交那一行之外的孤立提交），归到主干那一段。 */
+      for (let i = 0; i < count; i++) {
+        if (owner[i] < 0) owner[i] = trunk
+      }
+
+      /* 第二遍：逐行定列。 */
+      const rowLane = new Array(count).fill(0)
+      const rowColor = new Array(count).fill(0)
+      const branchLane = new Map()
+      const branchColor = new Map()
+      const laneLastRow = []
+      const laneHolder = []
+      const laneColor = []
+      let nextColor = 1
+
+      branchLane.set(trunk, 0)
+      branchColor.set(trunk, 0)
+
+      for (let i = 0; i < count; i++) {
+        const key = owner[i]
+        if (branchLane.has(key)) {
+          const lane = branchLane.get(key)
+          rowLane[i] = lane
+          rowColor[i] = branchColor.get(key)
+          laneLastRow[lane] = i
+          laneHolder[lane] = key
+          continue
+        }
+        /* 新分支：主干已固定，其余从第 1 列往右找第一个能用的。 */
+        let lane = 1
+        while (true) {
+          const last = laneLastRow[lane]
+          if (last === undefined) break
+          /* 紧挨着上一段结束的位置不许复用，否则两段接成一条直线。 */
+          if (last < i - 1) break
+          lane += 1
+        }
+        branchLane.set(key, lane)
+        /* 颜色跟父链、跟同列上一段都错开，避免看成同一条线。 */
+        let color = nextColor
+        if (laneColor[lane] !== undefined && color === laneColor[lane]) color += 1
+        nextColor = (color + 1) % 8
+        branchColor.set(key, color % 8)
+        rowLane[i] = lane
+        rowColor[i] = color % 8
+        laneLastRow[lane] = i
+        laneHolder[lane] = key
+        laneColor[lane] = color % 8
+      }
+
+      /* 第三遍：连线。父提交不在本窗口内的保持悬空，前端画到列表末尾即止。 */
+      const edges = []
+      for (let i = 0; i < count; i++) {
+        if (entries[i].uncommitted === true) {
+          const below = i + 1
+          if (below < count) {
+            edges.push({
+              from: i, to: below,
+              fromLane: rowLane[i], toLane: rowLane[below],
+              fromColor: rowColor[i], toColor: rowColor[below],
+              primary: true, ghost: true,
+            })
+          }
+          continue
+        }
+        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        for (let j = 0; j < parents.length; j++) {
+          const to = indexOf.get(parents[j])
+          if (to === undefined) {
+            if (j === 0) {
+              edges.push({
+                from: i, to: count, dangling: true,
+                fromLane: rowLane[i], toLane: rowLane[i],
+                fromColor: rowColor[i], toColor: rowColor[i],
+                primary: true,
+              })
+            }
+            continue
+          }
+          edges.push({
+            from: i, to: to,
+            fromLane: rowLane[i], toLane: rowLane[to],
+            fromColor: rowColor[i], toColor: rowColor[to],
+            primary: j === 0,
+          })
+        }
+      }
+
+      let laneCount = 1
+      for (const lane of rowLane) {
+        if (lane + 1 > laneCount) laneCount = lane + 1
+      }
+      return { rowLane: rowLane, rowColor: rowColor, laneCount: laneCount, edges: edges }
+    }
+
     function groupRefs(refs) {
       // 同一提交上，远程分支去掉远程名后若能与本地同名分支对上，就并进那个标签，
       // 对不上的远程才单独成标签。判断方式与 VSCode Git Graph 一致。
@@ -1337,8 +1496,6 @@ window.__ModuleLoader__.load({
 
       const [summary, setSummary] = useState(null)
       const [entries, setEntries] = useState([])
-      const [graphEdges, setGraphEdges] = useState([])
-      const [laneCount, setLaneCount] = useState(1)
       const [hasMore, setHasMore] = useState(false)
       const [loadingMore, setLoadingMore] = useState(false)
       const [error, setError] = useState(null)
@@ -1406,13 +1563,12 @@ window.__ModuleLoader__.load({
           // 已经往下翻过的部分要一起取回来，否则刷新会把列表截回第一页
           const limit = Math.max(PAGE_SIZE, entriesRef.current.length)
           const anchor = captureAnchor()
-          /* 布局由后端在完整历史上算好，这里只拿窗口内的行和线。 */
-          const data = await api('graph', { cwd: cwd, limit: limit, skip: 0 })
+          /* 布局在前端逐行算，只依赖已加载的这些提交。 */
+          const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
           pendingAnchorRef.current = anchor
           setEntries(Array.isArray(data.entries) ? data.entries : [])
-          setGraphEdges(Array.isArray(data.edges) ? data.edges : [])
-          setLaneCount(typeof data.laneCount === 'number' ? data.laneCount : 1)
+
           setHasMore(data.hasMore === true)
           setError(null)
         } catch (failure) {
@@ -1462,12 +1618,11 @@ window.__ModuleLoader__.load({
           /* 一次性重取整个窗口：行号和连线下标必须来自同一次计算，拼起来会错位。 */
           const limit = Math.max(PAGE_SIZE, entriesRef.current.length + PAGE_SIZE)
           const anchor = captureAnchor()
-          const data = await api('graph', { cwd: cwd, limit: limit, skip: 0 })
+          const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
           pendingAnchorRef.current = anchor
           setEntries(Array.isArray(data.entries) ? data.entries : [])
-          setGraphEdges(Array.isArray(data.edges) ? data.edges : [])
-          setLaneCount(typeof data.laneCount === 'number' ? data.laneCount : 1)
+
           setHasMore(data.hasMore === true)
         } catch (failure) {
           if (aliveRef.current) setError(failure.message)
@@ -1727,50 +1882,8 @@ window.__ModuleLoader__.load({
         return filtered.length === 0 ? allEntries : filtered
       }, [focus, allEntries, headHash])
 
-      /* 行位置与连线都来自后端算好的结果；未提交那一行跟着它下面的第一次提交走。 */
-      const layout = useMemo(() => {
-        const rowLane = []
-        const rowColor = []
-        const indexOf = new Map()
-        for (let i = 0; i < rowEntries.length; i++) {
-          const item = rowEntries[i]
-          indexOf.set(item.hash, i)
-          if (item.uncommitted === true) {
-            const below = rowEntries[i + 1]
-            rowLane.push(below === undefined || typeof below.lane !== 'number' ? 0 : below.lane)
-            rowColor.push(below === undefined || typeof below.color !== 'number' ? 0 : below.color)
-          } else {
-            rowLane.push(typeof item.lane === 'number' ? item.lane : 0)
-            rowColor.push(typeof item.color === 'number' ? item.color : 0)
-          }
-        }
-        const edges = []
-        for (const edge of graphEdges) {
-          const from = indexOf.get(edge.fromHash)
-          if (from === undefined) continue
-          /* 父提交还没加载到时，线一直画到画布底部，读者看得出这条链还在继续。 */
-          if (edge.dangling === true) {
-            edges.push({
-              from: from, to: rowEntries.length, dangling: true,
-              fromLane: edge.fromLane, toLane: edge.toLane,
-              fromColor: edge.fromColor, toColor: edge.toColor,
-              primary: edge.primary === true,
-            })
-            continue
-          }
-          const to = indexOf.get(edge.toHash)
-          if (to === undefined) continue
-          edges.push({ from: from, to: to, fromLane: edge.fromLane, toLane: edge.toLane, fromColor: edge.fromColor, toColor: edge.toColor, primary: edge.primary === true })
-        }
-        /* 未提交那一行是前端插进来的，后端不知道它，这条灰线得自己补。 */
-        if (rowEntries.length > 1 && rowEntries[0].uncommitted === true) {
-          edges.push({
-            from: 0, to: 1, fromLane: rowLane[0], toLane: rowLane[1],
-            fromColor: rowColor[0], toColor: rowColor[1], primary: true,
-          })
-        }
-        return { rowLane: rowLane, rowColor: rowColor, edges: edges, laneCount: Math.max(1, laneCount) }
-      }, [rowEntries, graphEdges, laneCount])
+      /* 列与连线全部在前端逐行算出来，只依赖已加载的这批提交。 */
+      const layout = useMemo(() => computeLanes(rowEntries), [rowEntries])
       const laneWidth = Math.max(24, layout.laneCount * LANE_W + 16)
 
 
