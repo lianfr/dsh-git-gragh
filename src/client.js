@@ -113,21 +113,23 @@ window.__ModuleLoader__.load({
   border-color:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
 .gw-ref-stash .gw-ref-flag { background:transparent;
   border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
-.gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
+.gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0; overflow:hidden;
   box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
   border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-ref-view { display:block; padding:0 5px; overflow:hidden; }
 .gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* 悬停时平滑滑到结尾停住，两端做羽化；文字没溢出时位移为 0，什么都不会发生。 */
-.gw-ref:hover .gw-ref-label {
-  mask-image:linear-gradient(to right, transparent, black 18px, black calc(100% - 18px), transparent); }
+/* 悬停时匀速滑到结尾停住；羽化作用在文字区内部，不会糊到边框上。 */
+.gw-ref:hover .gw-ref-view {
+  mask-image:linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent); }
 .gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
-  animation:gw-ref-slide 2.8s cubic-bezier(.4, 0, .2, 1) .2s forwards; }
+  animation-name:gw-ref-slide; animation-timing-function:linear;
+  animation-delay:.15s; animation-fill-mode:forwards; }
 @keyframes gw-ref-slide {
   from { transform:translateX(0); }
-  to { transform:translateX(min(0px, calc(-100% + 120px))); }
+  to { transform:translateX(var(--gw-ref-shift, 0px)); }
 }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
 .gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
@@ -693,10 +695,21 @@ window.__ModuleLoader__.load({
       else if (ref.type === 'remote') { cls += ' gw-ref-remote' }
       else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
       else { cls += ' gw-ref-branch' }
+      const hasRemotes = Array.isArray(props.remotes) && props.remotes.length > 0
+      // 等宽字体十号字，一个字符约六像素；按可见宽度算出要滑多远、滑多久（每秒六字符）。
+      const textWidth = label.length * 6
+      const visible = hasRemotes ? 96 : 130
+      const shift = Math.max(0, textWidth - visible)
+      const seconds = shift === 0 ? 0 : Math.max(0.6, shift / 36)
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
-        E('span', { className: 'gw-ref-label' }, E('span', { className: 'gw-ref-text' }, label)),
-        Array.isArray(props.remotes) && props.remotes.length > 0
+        E('span', { className: 'gw-ref-label' },
+          E('span', { className: 'gw-ref-view' },
+            E('span', {
+              className: 'gw-ref-text',
+              style: { animationDuration: seconds + 's', '--gw-ref-shift': '-' + shift + 'px' },
+            }, label))),
+        hasRemotes
           ? E('span', { className: 'gw-ref-remotes' }, props.remotes.join(' '))
           : null)
     }
