@@ -73,7 +73,8 @@ export function parseDecorations(raw) {
     const item = piece.trim()
     if (item === '') continue
     if (item.startsWith('HEAD -> ')) {
-      refs.push({ type: 'head', name: item.slice(8) })
+      const target = item.slice(8)
+      refs.push({ type: 'head', name: target.startsWith('refs/heads/') ? target.slice(11) : target })
       continue
     }
     if (item === 'HEAD') {
@@ -81,7 +82,25 @@ export function parseDecorations(raw) {
       continue
     }
     if (item.startsWith('tag: ')) {
-      refs.push({ type: 'tag', name: item.slice(5) })
+      const target = item.slice(5)
+      refs.push({ type: 'tag', name: target.startsWith('refs/tags/') ? target.slice(10) : target })
+      continue
+    }
+    if (item === 'refs/stash') {
+      refs.push({ type: 'stash', name: 'stash@{0}' })
+      continue
+    }
+    // --decorate=full 给的是完整 ref 名，本地分支里带斜杠也不会被误判成远程
+    if (item.startsWith('refs/heads/')) {
+      refs.push({ type: 'branch', name: item.slice(11) })
+      continue
+    }
+    if (item.startsWith('refs/remotes/')) {
+      refs.push({ type: 'remote', name: item.slice(13) })
+      continue
+    }
+    if (item.startsWith('refs/tags/')) {
+      refs.push({ type: 'tag', name: item.slice(10) })
       continue
     }
     refs.push({ type: item.includes('/') ? 'remote' : 'branch', name: item })

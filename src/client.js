@@ -103,6 +103,8 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-brand-primary); }
 .gw-ref-head { background:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary-inverted); }
 .gw-ref-tag { background:var(--dsw-alias-state-warn-primary); color:var(--dsw-alias-label-primary-inverted); }
+.gw-ref-stash { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
+  color:var(--dsw-alias-state-success-primary); }
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
@@ -342,7 +344,9 @@ window.__ModuleLoader__.load({
     }
 
     function computeLayout(entries) {
-      if (entries.length === 0) return { rowLane: [], laneCount: 1, edges: [], rowOfHash: new Map() }
+      if (entries.length === 0) {
+        return { rowLane: [], rowColor: [], laneCount: 1, edges: [], rowOfHash: new Map() }
+      }
 
       const rowOfHash = new Map()
       for (let i = 0; i < entries.length; i++) rowOfHash.set(entries[i].hash, i)
@@ -350,63 +354,158 @@ window.__ModuleLoader__.load({
       let trunkTip = findTrunkTip(entries)
       if (trunkTip === null) trunkTip = entries[0].hash
 
-      const TRUNK = -1
-      const trunkSet = new Set()
-      let cursor = trunkTip
-      let guard = 0
-      while (cursor !== null && cursor !== undefined && rowOfHash.has(cursor) && guard <= entries.length) {
-        trunkSet.add(cursor)
-        const idx = rowOfHash.get(cursor)
-        const parents = Array.isArray(entries[idx].parents) ? entries[idx].parents : []
-        cursor = parents.length > 0 ? parents[0] : null
-        guard += 1
+      // 哪些提交是某个分支的尖端——链在这些地方必须断开，
+      // 否则从 main 新开的分支会顺着第一父一路并进 main 那条线，看着是一根直线。
+      const isTip = new Array(entries.length).fill(false)
+      for (let i = 0; i < entries.length; i++) {
+        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
+        for (let r = 0; r < refs.length; r++) {
+          const type = refs[r] && refs[r].type
+          if (type === 'branch' || type === 'remote' || type === 'head') { isTip[i] = true; break }
+        }
       }
 
-      const active = new Map()
-      const rowChain = new Array(entries.length)
-      let nextChain = 0
+      // 一、切链：一条链从它的起点沿第一父一路往下走，撞到已经有主的提交就停。
+      // 建链的次序是 主干 → 各分支尖端 → 其余提交：先建的分支先占住自己的历史，
+      // 后建的撞上去就停。所以一条分支从头到尾是一条链、一个颜色，
+      // 中途换到哪一列都还是它自己，不会在分叉口断成两种颜色。
+      const chainOf = new Array(entries.length).fill(-1)
+      const chains = []
+      const createChain = (startRow) => {
+        const chain = { first: startRow, last: startRow, lane: 0, color: 0 }
+        let row = startRow
+        while (row >= 0 && chainOf[row] < 0) {
+          chainOf[row] = chains.length
+          chain.last = row
+          const parents = Array.isArray(entries[row].parents) ? entries[row].parents : []
+          if (parents.length === 0) break
+          const next = rowOfHash.get(parents[0])
+          if (next === undefined || next <= row) break
+          row = next
+        }
+        chains.push(chain)
+      }
+      const trunkRow = rowOfHash.get(trunkTip)
+      if (trunkRow !== undefined) createChain(trunkRow)
+      for (let i = 0; i < entries.length; i++) if (isTip[i] && chainOf[i] < 0) createChain(i)
+      for (let i = 0; i < entries.length; i++) if (chainOf[i] < 0) createChain(i)
 
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]
-        let chain
-        if (trunkSet.has(entry.hash)) {
-          chain = TRUNK
-          active.delete(entry.hash)
-        } else {
-          chain = active.get(entry.hash)
-          if (chain === undefined) {
-            chain = nextChain++
-          } else {
-            active.delete(entry.hash)
+      // 二、分列：主分支锁第 0 列；其余的从父列右边起，往右找第一条
+      // 「这条链的起点落在该列上一段结束之后」的道，找不到就新开一列。
+      const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
+
+      const laneLast = []
+      const laneOfRow = new Array(entries.length).fill(-1)
+
+      const fillRows = (chainIndex) => {
+        const chain = chains[chainIndex]
+        for (let i = 0; i < entries.length; i++) {
+          if (chainOf[i] === chainIndex) laneOfRow[i] = chain.lane
+        }
+      }
+
+      // 取色：颜色和列是两回事。每条链单独领一个颜色槽——从左往右找第一个
+      // 「上次用到行 < 本链起点」的槽，找不到就新开一个，记下本链的结束行。
+      // 所以同一条列上的两条链可以不同色，被让出来的槽也会被后面的链重新领走。
+      // 唯一的附加约束：不能领到父链那个槽，分叉出来的两条分支必须不同色。
+      const colourLast = []
+      const laneColour = []
+      const pickColour = (firstRow, lastRow, lane, fatherSlot) => {
+        const free = (from) => {
+          let slot = from
+          while (slot < colourLast.length && colourLast[slot] >= firstRow) slot += 1
+          return slot
+        }
+        const taken = (slot) => slot === fatherSlot || slot === laneColour[lane]
+        let slot = free(0)
+        while (taken(slot)) slot = free(slot + 1)
+        if (slot >= colourLast.length) colourLast.push(-1)
+        colourLast[slot] = lastRow
+        laneColour[lane] = slot
+        return slot
+      }
+
+      const takeLane = (chainIndex) => {
+        const chain = chains[chainIndex]
+        if (chainIndex === trunkChain) {
+          if (laneLast.length === 0) laneLast.push(chain.last)
+          laneLast[0] = Math.max(laneLast[0], chain.last)
+          chain.lane = 0
+          chain.color = pickColour(chain.first, chain.last, 0, -1)
+          fillRows(chainIndex)
+          return
+        }
+        // 分支一律向右分叉：新链要落在它分出去的那条分支所在列的右边，
+        // 只有合并的连线才会往左收。取链尾的父提交——那才是它接回主线的位置，
+        // 链首的父通常就在本链内部。
+        const tailParents = Array.isArray(entries[chain.last].parents) ? entries[chain.last].parents : []
+        const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
+        const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
+        const fatherLane = fatherChain >= 0 && fatherChain !== chainIndex ? laneOfRow[fatherRow] : -1
+        const fatherColor = fatherChain >= 0 && fatherChain !== chainIndex ? chains[fatherChain].color : -1
+        const start = Math.max(1, fatherLane + 1)
+
+        for (let j = start; j < laneLast.length; j++) {
+          if (chain.first > laneLast[j]) {
+            chain.lane = j
+            chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
+            laneLast[j] = chain.last
+            fillRows(chainIndex)
+            return
           }
         }
-        rowChain[i] = chain
-        const parents = Array.isArray(entry.parents) ? entry.parents : []
-        const first = parents.length > 0 ? parents[0] : null
-        if (first !== null && !trunkSet.has(first) && !active.has(first)) active.set(first, chain)
+        while (laneLast.length < start) laneLast.push(-1)
+        laneLast.push(chain.last)
+        chain.lane = laneLast.length - 1
+        chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
+        fillRows(chainIndex)
       }
 
-      const laneOfChain = new Map()
-      laneOfChain.set(TRUNK, 0)
-      let nextLane = 1
-      const rowLane = new Array(entries.length)
-      let laneCount = 1
+      // 链的层级：主干为 0，直接从主干分出来的为 1，再往下递增。
+      // 按层级从浅到深分配，子链落位时父链的列已经定好，
+      // 所以「分出来的链必须在父的右边」是算出来的，不是事后挪出来的。
+      const depth = new Array(chains.length).fill(0)
+      for (let round = 0; round < chains.length; round++) {
+        let changed = false
+        for (let i = 0; i < chains.length; i++) {
+          const tailParents = Array.isArray(entries[chains[i].last].parents) ? entries[chains[i].last].parents : []
+          const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
+          const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
+          if (fatherChain < 0 || fatherChain === i) continue
+          if (depth[i] < depth[fatherChain] + 1) {
+            depth[i] = depth[fatherChain] + 1
+            changed = true
+          }
+        }
+        if (!changed) break
+      }
+
+      const rest = []
+      for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
+      rest.sort((a, b) => (depth[a] - depth[b]) || (chains[a].first - chains[b].first))
+      const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
+      for (const index of order) takeLane(index)
+
+      const rowLane = new Array(entries.length).fill(0)
+      const rowColor = new Array(entries.length).fill(0)
       for (let i = 0; i < entries.length; i++) {
-        const chain = rowChain[i]
-        let lane = laneOfChain.get(chain)
-        if (lane === undefined) { lane = nextLane++; laneOfChain.set(chain, lane) }
-        rowLane[i] = lane
-        if (lane + 1 > laneCount) laneCount = lane + 1
+        const chain = chains[chainOf[i]]
+        rowLane[i] = chain.lane
+        rowColor[i] = chain.color
       }
 
-      // 未提交的改动跟它所属的分支同列，不单独占一条泳道
+      // 未提交的改动跟它所属的分支同列同色，不单独占道
       for (let i = 0; i < entries.length; i++) {
         if (entries[i].uncommitted !== true) continue
         const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
         const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
-        if (row !== undefined) rowLane[i] = rowLane[row]
+        if (row !== undefined) {
+          rowLane[i] = rowLane[row]
+          rowColor[i] = rowColor[row]
+        }
       }
-      laneCount = 1
+
+      let laneCount = 1
       for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
 
       const edges = []
@@ -415,11 +514,19 @@ window.__ModuleLoader__.load({
         for (let p = 0; p < parents.length; p++) {
           const row = rowOfHash.get(parents[p])
           if (row === undefined) continue
-          edges.push({ from: i, to: row, fromLane: rowLane[i], toLane: rowLane[row], primary: p === 0 })
+          edges.push({
+            from: i,
+            to: row,
+            fromLane: rowLane[i],
+            toLane: rowLane[row],
+            fromColor: rowColor[i],
+            toColor: rowColor[row],
+            primary: p === 0,
+          })
         }
       }
 
-      return { rowLane, laneCount, edges, rowOfHash }
+      return { rowLane, rowColor, laneCount, edges, rowOfHash }
     }
 
     /* ------------------------------------------------------------------ */
@@ -518,6 +625,7 @@ window.__ModuleLoader__.load({
       if (ref.type === 'head') { cls = 'gw-ref gw-ref-head'; label = ref.name === '' || ref.name === undefined ? 'HEAD' : ref.name }
       else if (ref.type === 'tag') { cls = 'gw-ref gw-ref-tag'; label = 'tag ' + ref.name }
       else if (ref.type === 'remote') { cls = 'gw-ref gw-ref-remote' }
+      else if (ref.type === 'stash') { cls = 'gw-ref gw-ref-stash' }
       return E('span', { className: cls, title: label }, label)
     }
 
@@ -1186,14 +1294,22 @@ window.__ModuleLoader__.load({
                         d = 'M' + x1 + ',' + y1 + ' L' + x1 + ',' + bottom
                           + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
                       } else {
-                        const mid = (y1 + y2) / 2
-                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
+                        // 换道收在起点下方一行之内，之后竖直跑到父提交。
+                        // 全程渐变会让长边斜穿中间好几行，看着像一根歪线。
+                        const span = y2 - y1
+                        const gap = Math.min(ROW_H * 0.7, span * 0.45)
+                        d = 'M' + x1 + ',' + y1
+                          + ' L' + x1 + ',' + (y1 + gap * 0.35)
+                          + ' C' + x1 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 0.85) + ' ' + x2 + ',' + (y1 + gap * 1.35)
+                          + ' L' + x2 + ',' + y2
                       }
+                      // 未提交那一行不属于任何分支，它连下来的线跟着用中性灰
+                      const ghost = rowEntries[edge.from] !== undefined && rowEntries[edge.from].uncommitted === true
                       return E('path', {
                         key: 'e' + String(index),
                         d: d,
                         fill: 'none',
-                        stroke: laneColor(edge.fromLane),
+                        stroke: ghost ? 'var(--dsw-alias-label-tertiary)' : laneColor(edge.primary ? edge.fromColor : edge.toColor),
                         strokeWidth: edge.primary ? 1.6 : 1.2,
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
@@ -1205,10 +1321,10 @@ window.__ModuleLoader__.load({
                         cx: layout.rowLane[index] * LANE_W + 12,
                         cy: offsets.list[index] + ROW_H / 2,
                         r: hollow ? 3.6 : 3.4,
-                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowLane[index]),
+                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowColor[index]),
                         stroke: hollow === false
                           ? 'var(--dsw-alias-bg-layer-1)'
-                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowLane[index])),
+                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowColor[index])),
                         strokeWidth: hollow ? 1.6 : 1.2,
                       })
                     })),
