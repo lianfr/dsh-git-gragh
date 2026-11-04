@@ -103,6 +103,8 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-brand-primary); }
 .gw-ref-head { background:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary-inverted); }
 .gw-ref-tag { background:var(--dsw-alias-state-warn-primary); color:var(--dsw-alias-label-primary-inverted); }
+.gw-ref-stash { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
+  color:var(--dsw-alias-state-success-primary); }
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
@@ -518,6 +520,7 @@ window.__ModuleLoader__.load({
       if (ref.type === 'head') { cls = 'gw-ref gw-ref-head'; label = ref.name === '' || ref.name === undefined ? 'HEAD' : ref.name }
       else if (ref.type === 'tag') { cls = 'gw-ref gw-ref-tag'; label = 'tag ' + ref.name }
       else if (ref.type === 'remote') { cls = 'gw-ref gw-ref-remote' }
+      else if (ref.type === 'stash') { cls = 'gw-ref gw-ref-stash' }
       return E('span', { className: cls, title: label }, label)
     }
 

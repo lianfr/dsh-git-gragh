@@ -144,9 +144,14 @@ async function log(payload) {
   const cwd = requireCwd(payload)
   const limit = boundedNumber(payload.limit, 100, 1, 500)
   const skip = boundedNumber(payload.skip, 0, 0, 100000)
-  const args = ['log', '--date-order', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
+  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
   if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
-  else args.push('--branches', '--tags', '--remotes', 'HEAD')
+  else {
+    args.push('--branches', '--tags', '--remotes', 'HEAD')
+    // stash 单独挂进来：它不在 branches/tags/remotes 里，但图上要看得见
+    const stashRef = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
+    if (stashRef !== null && stashRef.trim() !== '') args.push('refs/stash')
+  }
 
   let raw = ''
   try {
@@ -158,7 +163,9 @@ async function log(payload) {
     }
     throw error
   }
-  const entries = parseLog(raw)
+  let entries = parseLog(raw)
+  // stash 的第二父是它自己的 index 快照，画出来只会多一个没人认识的节点
+  entries = entries.filter((entry) => !/^index on /.test(entry.subject))
   const hasMore = entries.length > limit
   return { entries: hasMore ? entries.slice(0, limit) : entries, hasMore }
 }
@@ -172,7 +179,7 @@ async function branches(payload) {
 async function commitDetail(payload) {
   const cwd = requireCwd(payload)
   const hash = hashArg(payload.hash)
-  const metaRaw = await gitText(cwd, ['show', '--no-patch', '--format=' + DETAIL_FORMAT, hash])
+  const metaRaw = await gitText(cwd, ['show', '--no-patch', '--decorate=full', '--format=' + DETAIL_FORMAT, hash])
   const fields = metaRaw.replace(/\n$/, '').split(LOG_FIELD)
   const [fullHash, short, parents, author, email, time, committer, committerEmail, committedAt, decorations, body] = fields
   const filesRaw = await gitText(cwd, ['show', '--numstat', '--format=', hash])
