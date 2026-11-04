@@ -26,7 +26,8 @@ window.__ModuleLoader__.load({
 
 .gw-textarea { width:100%; box-sizing:border-box; min-height:54px; max-height:160px; resize:vertical;
   font:inherit; color:var(--dsw-alias-label-primary); background:var(--dsw-alias-bg-layer-1);
-  border:1px solid var(--dsw-alias-border-l2); border-radius:var(--dsw-radius-panel); padding:6px 12px;
+  border:1px solid var(--dsw-alias-border-l2); border-radius:28px;
+  border-radius:var(--dsw-radius-panel); padding:6px 12px;
   outline:none; }
 .gw-textarea:focus { border-color:var(--dsw-alias-brand-primary); }
 .gw-textarea::placeholder { color:var(--dsw-alias-label-tertiary); }
