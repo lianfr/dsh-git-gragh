@@ -473,9 +473,11 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ */
 
     function RefBadge(props) {
-      const ref = props.ref
+      // 注意：props 里不能叫 ref —— React 会把 ref 当特殊属性吞掉，值永远读到 undefined。
+      const ref = props.item
+      if (!ref || typeof ref !== 'object') return null
       let cls = 'gw-ref gw-ref-branch'
-      let label = ref.name
+      let label = ref.name === undefined ? '' : ref.name
       if (ref.type === 'head') { cls = 'gw-ref gw-ref-head'; label = ref.name === '' || ref.name === undefined ? 'HEAD' : ref.name }
       else if (ref.type === 'tag') { cls = 'gw-ref gw-ref-tag'; label = 'tag ' + ref.name }
       else if (ref.type === 'remote') { cls = 'gw-ref gw-ref-remote' }
@@ -557,7 +559,7 @@ window.__ModuleLoader__.load({
         title: entry.subject,
       },
         E('span', { className: 'gw-row-hash' }, entry.short),
-        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), ref: ref })),
+        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
         E('span', { className: 'gw-row-meta' }, entry.author + ' · ' + relativeTime(entry.time, t)))
     }
@@ -736,18 +738,19 @@ window.__ModuleLoader__.load({
         await refreshLog()
       }, [refreshSummary, refreshLog])
 
+      // 只在切换仓库时清空视图；可见性变化只负责重新拉取，避免同一次挂载发起两轮请求。
       useEffect(() => {
         setSummary(null)
         setEntries([])
         setSelected(null)
         setDetail(null)
         setDiffView(null)
-        void refreshAll()
-      }, [cwd, refreshAll])
+      }, [cwd])
 
       useEffect(() => {
-        if (props.visible !== false) void refreshAll()
-      }, [props.visible, refreshAll])
+        if (props.visible === false) return
+        void refreshAll()
+      }, [cwd, props.visible, refreshAll])
 
       const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore || cwd === '') return
