@@ -704,6 +704,18 @@ window.__ModuleLoader__.load({
       ].join('\u0000')
     }
 
+    /**
+     * 图上每一行的列与颜色。
+     *
+     * 规则来自需求本身：
+     * - 主分支独占第 0 列。
+     * - 一条分支从它的尖端沿第一父一路往下走，撞到已经属于别人的提交就停。
+     *   分出来的那一刻就定下了自己站哪一列，不需要看下面还有什么，所以
+     *   只加载最近一百条和加载全部历史算出来的列完全一致。
+     * - 分叉一律向右：新分支的列总在父分支的右边。
+     * - 每条分支独占一列，因此不会出现两段线接成一条直线的错觉。
+     * - 颜色跟着分支走，并且和父分支不同色。
+     */
     function computeLayout(entries) {
       if (entries.length === 0) {
         return { rowLane: [], rowColor: [], laneCount: 1, edges: [], rowOfHash: new Map() }
@@ -712,176 +724,125 @@ window.__ModuleLoader__.load({
       const rowOfHash = new Map()
       for (let i = 0; i < entries.length; i++) rowOfHash.set(entries[i].hash, i)
 
-      let trunkTip = findTrunkTip(entries)
-      if (trunkTip === null) trunkTip = entries[0].hash
+      const refsOf = (index) => (Array.isArray(entries[index].refs) ? entries[index].refs : [])
+      const parentsOf = (index) => (Array.isArray(entries[index].parents) ? entries[index].parents : [])
 
-      // 哪些提交是某个分支的尖端——链在这些地方必须断开，
-      // 否则从 main 新开的分支会顺着第一父一路并进 main 那条线，看着是一根直线。
-      const isTip = new Array(entries.length).fill(false)
-      for (let i = 0; i < entries.length; i++) {
-        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
-        for (let r = 0; r < refs.length; r++) {
-          const type = refs[r] && refs[r].type
-          if (type === 'branch' || type === 'remote' || type === 'head') { isTip[i] = true; break }
+      // 主干：main / master 优先，其次是当前检出的分支，都没有就取第一行。
+      const trunkTip = findTrunkTip(entries)
+      let trunkRow = trunkTip === null ? undefined : rowOfHash.get(trunkTip)
+      if (trunkRow === undefined) {
+        for (let i = 0; i < entries.length; i++) {
+          let hit = false
+          for (const ref of refsOf(i)) {
+            if (ref !== null && ref !== undefined && ref.type === 'head') { hit = true; break }
+          }
+          if (hit) { trunkRow = i; break }
         }
       }
+      if (trunkRow === undefined) trunkRow = 0
 
-      // 一、切链：一条链从它的起点沿第一父一路往下走，撞到已经有主的提交就停。
-      // 建链的次序是 主干 → 各分支尖端 → 其余提交：先建的分支先占住自己的历史，
-      // 后建的撞上去就停。所以一条分支从头到尾是一条链、一个颜色，
-      // 中途换到哪一列都还是它自己，不会在分叉口断成两种颜色。
-      const chainOf = new Array(entries.length).fill(-1)
-      const chains = []
-      const createChain = (startRow) => {
-        const chain = { first: startRow, last: startRow, lane: 0, color: 0 }
-        let row = startRow
-        while (row >= 0 && chainOf[row] < 0) {
-          chainOf[row] = chains.length
-          chain.last = row
-          const parents = Array.isArray(entries[row].parents) ? entries[row].parents : []
+      // 一、认领分支。每条分支从自己的尖端往下走，撞上有主的提交就停；
+      // 停下时脚踩的那一行属于父分支，这就是「从哪儿分出来的」。
+      const owner = new Array(entries.length).fill(-1)
+      const branches = []
+
+      const claim = (tipRow, parentBranch) => {
+        const index = branches.length
+        branches.push({ tip: tipRow, last: tipRow, parent: parentBranch, lane: 0, color: 0 })
+        let row = tipRow
+        let stop = -1
+        while (row >= 0 && row < entries.length && owner[row] < 0) {
+          owner[row] = index
+          branches[index].last = row
+          const parents = parentsOf(row)
           if (parents.length === 0) break
           const next = rowOfHash.get(parents[0])
           if (next === undefined || next <= row) break
           row = next
         }
-        chains.push(chain)
-      }
-      const trunkRow = rowOfHash.get(trunkTip)
-      if (trunkRow !== undefined) createChain(trunkRow)
-      for (let i = 0; i < entries.length; i++) if (isTip[i] && chainOf[i] < 0) createChain(i)
-      for (let i = 0; i < entries.length; i++) if (chainOf[i] < 0) createChain(i)
-
-      // 二、分列：主分支锁第 0 列；其余的从父列右边起，往右找第一条
-      // 「这条链的起点落在该列上一段结束之后」的道，找不到就新开一列。
-      const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
-
-      const laneLast = []
-      const laneOfRow = new Array(entries.length).fill(-1)
-
-      const fillRows = (chainIndex) => {
-        const chain = chains[chainIndex]
-        for (let i = 0; i < entries.length; i++) {
-          if (chainOf[i] === chainIndex) laneOfRow[i] = chain.lane
-        }
+        // 撞上别人的那一行，就是这条分支的父分支
+        if (row >= 0 && row < entries.length && owner[row] >= 0 && owner[row] !== index) stop = owner[row]
+        if (stop >= 0) branches[index].parent = stop
+        return index
       }
 
-      // 取色：颜色和列是两回事。每条链单独领一个颜色槽——从左往右找第一个
-      // 「上次用到行 < 本链起点」的槽，找不到就新开一个，记下本链的结束行。
-      // 所以同一条列上的两条链可以不同色，被让出来的槽也会被后面的链重新领走。
-      // 唯一的附加约束：不能领到父链那个槽，分叉出来的两条分支必须不同色。
-      const colourLast = []
-      const laneColour = []
-      const pickColour = (firstRow, lastRow, lane, fatherSlot) => {
-        const free = (from) => {
-          let slot = from
-          while (slot < colourLast.length && colourLast[slot] >= firstRow) slot += 1
-          return slot
-        }
-        const taken = (slot) => slot === fatherSlot || slot === laneColour[lane]
-        let slot = free(0)
-        while (taken(slot)) slot = free(slot + 1)
-        if (slot >= colourLast.length) colourLast.push(-1)
-        colourLast[slot] = lastRow
-        laneColour[lane] = slot
-        return slot
-      }
+      const trunkBranch = claim(trunkRow, -1)
+      branches[trunkBranch].lane = 0
 
-      const takeLane = (chainIndex) => {
-        const chain = chains[chainIndex]
-        if (chainIndex === trunkChain) {
-          if (laneLast.length === 0) laneLast.push(chain.last)
-          laneLast[0] = Math.max(laneLast[0], chain.last)
-          chain.lane = 0
-          chain.color = pickColour(chain.first, chain.last, 0, -1)
-          fillRows(chainIndex)
-          return
-        }
-        // 分支一律向右分叉：新链要落在它分出去的那条分支所在列的右边，
-        // 只有合并的连线才会往左收。取链尾的父提交——那才是它接回主线的位置，
-        // 链首的父通常就在本链内部。
-        const tailParents = Array.isArray(entries[chain.last].parents) ? entries[chain.last].parents : []
-        const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
-        const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
-        const fatherLane = fatherChain >= 0 && fatherChain !== chainIndex ? laneOfRow[fatherRow] : -1
-        const fatherColor = fatherChain >= 0 && fatherChain !== chainIndex ? chains[fatherChain].color : -1
-        const start = Math.max(1, fatherLane + 1)
-
-        for (let j = start; j < laneLast.length; j++) {
-          if (chain.first > laneLast[j]) {
-            chain.lane = j
-            chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
-            laneLast[j] = chain.last
-            fillRows(chainIndex)
-            return
+      // 尖端按行号从上到下处理：上面的分支先占位，下面的只能往右让，所以分叉永远向右。
+      for (let i = 0; i < entries.length; i++) {
+        if (owner[i] >= 0) continue
+        let hasTip = false
+        for (const ref of refsOf(i)) {
+          if (ref === null || ref === undefined) continue
+          const type = ref.type
+          if (type === 'branch' || type === 'remote' || type === 'head' || type === 'stash' || type === 'tag') {
+            hasTip = true
+            break
           }
         }
-        while (laneLast.length < start) laneLast.push(-1)
-        laneLast.push(chain.last)
-        chain.lane = laneLast.length - 1
-        chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
-        fillRows(chainIndex)
+        if (hasTip) claim(i, -1)
       }
 
-      // 链的层级：主干为 0，直接从主干分出来的为 1，再往下递增。
-      // 按层级从浅到深分配，子链落位时父链的列已经定好，
-      // 所以「分出来的链必须在父的右边」是算出来的，不是事后挪出来的。
-      const depth = new Array(chains.length).fill(0)
-      for (let round = 0; round < chains.length; round++) {
-        let changed = false
-        for (let i = 0; i < chains.length; i++) {
-          const tailParents = Array.isArray(entries[chains[i].last].parents) ? entries[chains[i].last].parents : []
-          const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
-          const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
-          if (fatherChain < 0 || fatherChain === i) continue
-          if (depth[i] < depth[fatherChain] + 1) {
-            depth[i] = depth[fatherChain] + 1
-            changed = true
-          }
+      // 二、还没归属的提交：跟着它的第一父；父也没有就并进主干。
+      // 从下往上补，保证父先有主。
+      for (let i = entries.length - 1; i >= 0; i--) {
+        if (owner[i] >= 0) continue
+        const parents = parentsOf(i)
+        const parentRow = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
+        owner[i] = parentRow !== undefined && owner[parentRow] >= 0 ? owner[parentRow] : trunkBranch
+      }
+
+      // 三、分列。从父分支右边一格起往右找：这一列上一条分支已经在自己上方收尾，
+      // 就说明两段线不会连在一起，可以复用；否则再往右让一格。
+      const laneLast = [branches[trunkBranch].last]
+      const laneColor = [0]
+      let laneCount = 1
+      for (let index = 0; index < branches.length; index++) {
+        if (index === trunkBranch) continue
+        const branch = branches[index]
+        const parent = branch.parent
+        const base = parent >= 0 ? branches[parent].lane : 0
+        const parentColor = parent >= 0 ? branches[parent].color : -1
+        let lane = base + 1
+        while (laneLast[lane] !== undefined && laneLast[lane] >= branch.tip) lane += 1
+        laneLast[lane] = branch.last
+        branch.lane = lane
+        if (lane + 1 > laneCount) laneCount = lane + 1
+
+        // 四、配色跟着分支走：避开父分支那一色，也避开同一列上一条分支那一色。
+        let color = index % LANE_COLORS.length
+        let guard = 0
+        while (guard < LANE_COLORS.length && (color === parentColor || color === laneColor[lane])) {
+          color = (color + 1) % LANE_COLORS.length
+          guard += 1
         }
-        if (!changed) break
+        laneColor[lane] = color
+        branch.color = color
       }
-
-      const rest = []
-      for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
-      rest.sort((a, b) => (depth[a] - depth[b]) || (chains[a].first - chains[b].first))
-      const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
-      for (const index of order) takeLane(index)
 
       const rowLane = new Array(entries.length).fill(0)
       const rowColor = new Array(entries.length).fill(0)
       for (let i = 0; i < entries.length; i++) {
-        const chain = chains[chainOf[i]]
-        rowLane[i] = chain.lane
-        rowColor[i] = chain.color
+        const branch = branches[owner[i]]
+        rowLane[i] = branch.lane
+        rowColor[i] = branch.color
       }
 
-      // 未提交的改动跟它所属的分支同列同色，不单独占道
-      for (let i = 0; i < entries.length; i++) {
-        if (entries[i].uncommitted !== true) continue
-        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
-        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
-        if (row !== undefined) {
-          rowLane[i] = rowLane[row]
-          rowColor[i] = rowColor[row]
-        }
-      }
-
-      let laneCount = 1
-      for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
-
+      // 五、连线。
       const edges = []
       for (let i = 0; i < entries.length; i++) {
-        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        const parents = parentsOf(i)
         for (let p = 0; p < parents.length; p++) {
-          const row = rowOfHash.get(parents[p])
-          if (row === undefined) continue
+          const target = rowOfHash.get(parents[p])
+          if (target === undefined) continue
           edges.push({
             from: i,
-            to: row,
+            to: target,
             fromLane: rowLane[i],
-            toLane: rowLane[row],
+            toLane: rowLane[target],
             fromColor: rowColor[i],
-            toColor: rowColor[row],
+            toColor: rowColor[target],
             primary: p === 0,
           })
         }
