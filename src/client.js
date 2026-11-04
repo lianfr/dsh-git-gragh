@@ -19,7 +19,7 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ */
 
     const CSS = `
-.gw-root { display:flex; flex-direction:column; height:100%; min-height:0; font-size:12px; line-height:1.4;
+.gw-root { position:relative; display:flex; flex-direction:column; height:100%; min-height:0; font-size:12px; line-height:1.4;
   color:var(--dsw-alias-label-primary); background:transparent; }
 .gw-top { flex:1 1 33%; min-height:110px; display:flex; flex-direction:column; min-height:0;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
@@ -208,9 +208,13 @@ window.__ModuleLoader__.load({
 .gw-diff-del .gw-diff-text { color:var(--dsw-alias-state-error-primary); }
 
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
-.gw-err { margin:6px 10px 0; padding:5px 8px; border-radius:5px; font-size:11.5px;
-  background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
-  color:var(--dsw-alias-state-error-primary); }
+/* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
+.gw-err { position:absolute; top:6px; left:10px; right:10px; z-index:60; padding:6px 9px;
+  border-radius:5px; border-radius:var(--dsw-radius-xs, 4px); font-size:11.5px;
+  background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, var(--dsw-alias-bg-layer-2));
+  color:var(--dsw-alias-state-error-primary);
+  border:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent);
+  box-shadow:0 6px 18px rgba(0,0,0,.16); pointer-events:none; }
 .gw-menu { position:fixed; z-index:9999; min-width:190px; padding:4px; border-radius:8px;
   background:var(--dsw-alias-bg-layer-3); border:1px solid var(--dsw-alias-border-l2);
   box-shadow:0 8px 24px rgba(0,0,0,.28); }
