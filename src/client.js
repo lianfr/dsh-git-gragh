@@ -97,17 +97,18 @@ window.__ModuleLoader__.load({
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-row-sep { opacity:.5; }
 
-.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; box-sizing:border-box;
-  border-radius:4px; border-radius:var(--dsw-radius-xs, 4px); border:1px solid transparent;
-  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); color:var(--gw-ref-ink, #fff);
-  font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden;
-  white-space:nowrap; }
-.gw-ref-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.gw-ref-head { font-weight:600; }
-.gw-ref-remote { border-style:dashed; border-color:var(--gw-ref-ink); }
-.gw-ref-tag { border-style:solid; border-color:var(--gw-ref-ink); }
-.gw-ref-stash { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
-  color:var(--dsw-alias-state-success-primary); border-color:transparent; }
+.gw-ref { display:inline-flex; align-items:stretch; height:15px; flex:none; max-width:150px;
+  overflow:hidden; box-sizing:border-box;
+  border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
+  border:1px solid var(--dsw-alias-border-l2);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-ref-flag { width:4px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-label { display:flex; align-items:center; min-width:0; padding:0 5px 0 4px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:10px; font-weight:500; color:var(--dsw-alias-label-secondary); }
+.gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
+.gw-ref-remote .gw-ref-label { font-style:italic; }
+.gw-ref-stash .gw-ref-label { color:var(--dsw-alias-state-success-primary); }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
   background:var(--dsw-alias-bg-layer-1);
@@ -319,17 +320,7 @@ window.__ModuleLoader__.load({
       return LANE_COLORS[lane % LANE_COLORS.length]
     }
 
-    function readableOn(hex) {
-      // 八种链色的亮度差得不少，一律配白字会让黄绿那几种糊成一团。
-      // 按感知亮度挑深色或白色字，保证任何链色上文字都清楚。
-      if (typeof hex !== 'string' || hex.length < 7) return '#ffffff'
-      const r = parseInt(hex.slice(1, 3), 16)
-      const g = parseInt(hex.slice(3, 5), 16)
-      const b = parseInt(hex.slice(5, 7), 16)
-      if (!isFinite(r) || !isFinite(g) || !isFinite(b)) return '#ffffff'
-      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      return lum > 0.6 ? '#141414' : '#ffffff'
-    }
+
 
     function findTrunkTip(entries) {
       const names = ['main', 'master']
@@ -641,10 +632,11 @@ window.__ModuleLoader__.load({
       else if (ref.type === 'remote') { cls += ' gw-ref-remote' }
       else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
       else { cls += ' gw-ref-branch' }
-      const style = { '--gw-ref-fill': chain, '--gw-ref-ink': readableOn(chain) }
-      return E('span', { className: cls, style: style, title: label },
+      return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
+        E('span', { className: 'gw-ref-flag' }),
         E('span', { className: 'gw-ref-label' }, label))
     }
+
 
 
     function FileRow(props) {
