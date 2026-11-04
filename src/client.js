@@ -89,24 +89,71 @@ window.__ModuleLoader__.load({
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-row-sel, .gw-row-sel:hover { background:var(--dsw-alias-interactive-bg-active);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
-.gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+.gw-row-subject { overflow:hidden; white-space:nowrap; flex:1 1 auto; }
+.gw-row-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 .gw-row-ghost { cursor: default; }
-    .gw-row-ghost .gw-row-subject { color: var(--dsw-alias-label-secondary); }
-    .gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
+.gw-row-ghost .gw-row-subject { color: var(--dsw-alias-label-secondary); }
+.gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
   color:var(--dsw-alias-label-tertiary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-row-sep { opacity:.5; }
 
-.gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
-  font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
-.gw-ref-branch { background:color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
-  color:var(--dsw-alias-brand-primary); }
-.gw-ref-head { background:var(--dsw-alias-brand-primary); color:var(--dsw-alias-label-primary-inverted); }
-.gw-ref-tag { background:var(--dsw-alias-state-warn-primary); color:var(--dsw-alias-label-primary-inverted); }
-.gw-ref-stash { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
-  color:var(--dsw-alias-state-success-primary); }
-.gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
-  color:var(--dsw-alias-label-secondary); }
+/* 拼接式：左格自带一圈链色边，右格自带一圈中性边，两格共一条分界线。 */
+.gw-ref { display:inline-flex; align-items:stretch; height:15px; flex:none; max-width:150px;
+  overflow:hidden; box-sizing:border-box; }
+.gw-ref-flag { width:7px; flex:none; box-sizing:border-box;
+  border-radius:4px 0 0 4px; border-radius:var(--dsw-radius-xs, 4px) 0 0 var(--dsw-radius-xs, 4px);
+  border:1px solid transparent;
+  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-remote .gw-ref-flag {
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+/* 标签与 stash 是特殊类型：整块用四成透明的链色描边，内部照常是中性文字与统一底色。 */
+.gw-ref-tag, .gw-ref-stash {
+  --gw-ref-edge:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+.gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag {
+  background:transparent;
+  border-color:var(--gw-ref-edge); }
+.gw-ref-tag .gw-ref-label, .gw-ref-stash .gw-ref-label,
+.gw-ref-tag .gw-ref-kind, .gw-ref-stash .gw-ref-kind,
+.gw-ref-tag .gw-ref-remotes, .gw-ref-stash .gw-ref-remotes { border-color:var(--gw-ref-edge); }
+
+.gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0; overflow:hidden;
+  box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
+  font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-ref-view { display:block; padding:0 5px; overflow:hidden; }
+.gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* 悬停时匀速滑到结尾停住；羽化作用在文字区内部，不会糊到边框上。 */
+.gw-ref:hover .gw-ref-view {
+  mask-image:linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent); }
+.gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
+  animation-name:gw-ref-slide; animation-timing-function:linear;
+  animation-delay:.15s; animation-fill-mode:forwards; }
+@keyframes gw-ref-slide {
+  from { transform:translateX(0); }
+  to { transform:translateX(var(--gw-ref-shift, 0px)); }
+}
+.gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
+.gw-ref-kind { position:relative; display:flex; align-items:center; justify-content:center; flex:none;
+  padding:0 3px; box-sizing:border-box;
+  border:1px solid var(--dsw-alias-border-l2); border-left:none; border-right:none;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
+  font-size:10px; line-height:13px; color:var(--dsw-alias-label-secondary); }
+/* 旗子右侧那条分隔不满高，上下各留两像素，弱化成一处分隔暗示。 */
+.gw-ref-kind::after { content:''; position:absolute; right:0; top:2px; bottom:2px; width:1px;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 20%, transparent); }
+.gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
+  border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
+  font-size:9px; color:var(--dsw-alias-label-tertiary); white-space:nowrap; }
+.gw-ref-remote .gw-ref-label { font-style:italic; }
+/* 后面还接着远程那格时，文字格的右边不再是外沿，圆角与右边框都让给它。 */
+.gw-ref-linked .gw-ref-label { border-radius:0; border-right:none; }
+.gw-ref-linked .gw-ref-remotes { border-left:1px solid var(--dsw-alias-border-l2); }
 
 .gw-drawer { position:absolute; left:0; right:0; z-index:1;
   background:var(--dsw-alias-bg-layer-1);
@@ -317,6 +364,8 @@ window.__ModuleLoader__.load({
     function laneColor(lane) {
       return LANE_COLORS[lane % LANE_COLORS.length]
     }
+
+
 
     function findTrunkTip(entries) {
       const names = ['main', 'master']
@@ -616,18 +665,74 @@ window.__ModuleLoader__.load({
     /* pieces                                                              */
     /* ------------------------------------------------------------------ */
 
+    function groupRefs(refs) {
+      // 同一提交上，远程分支去掉远程名后若能与本地同名分支对上，就并进那个标签，
+      // 对不上的远程才单独成标签。判断方式与 VSCode Git Graph 一致。
+      const heads = []
+      const rest = []
+      const byName = new Map()
+      for (const ref of refs) {
+        if (ref.type === 'head' || ref.type === 'branch') {
+          const item = { ref: ref, remotes: [] }
+          heads.push(item)
+          if (typeof ref.name === 'string') byName.set(ref.name, item)
+        } else {
+          rest.push(ref)
+        }
+      }
+      const pending = []
+      for (const ref of rest) {
+        if (ref.type === 'remote' && typeof ref.name === 'string') {
+          const slash = ref.name.indexOf('/')
+          if (slash > 0) {
+            const remoteName = ref.name.slice(0, slash)
+            const target = byName.get(ref.name.slice(slash + 1))
+            if (target !== undefined) {
+              target.remotes.push(remoteName)
+              continue
+            }
+          }
+        }
+        pending.push(ref)
+      }
+      heads.sort((a, b) => (a.ref.type === 'head' ? -1 : 0) - (b.ref.type === 'head' ? -1 : 0))
+      return { heads: heads, rest: pending }
+    }
+
     function RefBadge(props) {
       // 注意：props 里不能叫 ref —— React 会把 ref 当特殊属性吞掉，值永远读到 undefined。
       const ref = props.item
       if (!ref || typeof ref !== 'object') return null
-      let cls = 'gw-ref gw-ref-branch'
-      let label = ref.name === undefined ? '' : ref.name
-      if (ref.type === 'head') { cls = 'gw-ref gw-ref-head'; label = ref.name === '' || ref.name === undefined ? 'HEAD' : ref.name }
-      else if (ref.type === 'tag') { cls = 'gw-ref gw-ref-tag'; label = 'tag ' + ref.name }
-      else if (ref.type === 'remote') { cls = 'gw-ref gw-ref-remote' }
-      else if (ref.type === 'stash') { cls = 'gw-ref gw-ref-stash' }
-      return E('span', { className: cls, title: label }, label)
+      const chain = typeof props.color === 'string' && props.color !== '' ? props.color : '#4c9aff'
+      let cls = 'gw-ref'
+      let label = ref.name === undefined || ref.name === null ? '' : String(ref.name)
+      if (ref.type === 'head') { cls += ' gw-ref-head'; if (label === '') label = 'HEAD' }
+      else if (ref.type === 'tag') { cls += ' gw-ref-tag' }
+      else if (ref.type === 'remote') { cls += ' gw-ref-remote' }
+      else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
+      else { cls += ' gw-ref-branch' }
+      const hasRemotes = Array.isArray(props.remotes) && props.remotes.length > 0
+      // 等宽字体十号字，一个字符约六像素；按可见宽度算出要滑多远、滑多久（每秒四字符）。
+      const textWidth = label.length * 6
+      const visible = hasRemotes ? 96 : 130
+      const shift = Math.max(0, textWidth - visible)
+      const seconds = shift === 0 ? 0 : Math.max(0.8, shift / 24)
+      if (hasRemotes) cls += ' gw-ref-linked'
+      return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
+        E('span', { className: 'gw-ref-flag' }),
+        ref.type === 'tag' ? E('span', { className: 'gw-ref-kind' }, '⚑') : null,
+        E('span', { className: 'gw-ref-label' },
+          E('span', { className: 'gw-ref-view' },
+            E('span', {
+              className: 'gw-ref-text',
+              style: { animationDuration: seconds + 's', '--gw-ref-shift': '-' + shift + 'px' },
+            }, label))),
+        hasRemotes
+          ? E('span', { className: 'gw-ref-remotes' }, props.remotes.join(' '))
+          : null)
     }
+
+
 
     function FileRow(props) {
       const item = props.item
@@ -696,13 +801,14 @@ window.__ModuleLoader__.load({
       const y = props.y
       const t = props.t
       const refs = Array.isArray(entry.refs) ? entry.refs : []
+      const grouped = groupRefs(refs)
       if (entry.uncommitted === true) {
         return E('div', {
           className: 'gw-row gw-row-ghost',
           style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
           title: entry.subject,
         },
-          E('span', { className: 'gw-row-subject' }, entry.subject))
+          E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)))
       }
       return E('div', {
         className: 'gw-row' + (props.selected ? ' gw-row-sel' : ''),
@@ -711,8 +817,11 @@ window.__ModuleLoader__.load({
         onContextMenu: props.onContextMenu,
         title: entry.subject,
       },
-        refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
-        E('span', { className: 'gw-row-subject' }, entry.subject),
+        grouped.heads.map((head, index) => E(RefBadge, {
+          key: 'h' + String(index), item: head.ref, color: props.color, remotes: head.remotes,
+        })),
+        grouped.rest.map((ref, index) => E(RefBadge, { key: 'o' + String(index), item: ref, color: props.color })),
+        E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)),
         E('span', { className: 'gw-row-meta' },
           E('span', null, entry.author),
           E('span', { className: 'gw-row-sep' }, '·'),
@@ -1261,6 +1370,9 @@ window.__ModuleLoader__.load({
           title: 'refresh',
         }, '⟳'))
 
+      // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
+      const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
+
       const body = diffView !== null
         ? E(DiffPane, {
             t: t,
@@ -1315,7 +1427,9 @@ window.__ModuleLoader__.load({
                       })
                     }),
                     rowEntries.map((entry, index) => {
-                      const hollow = entry.uncommitted === true || (headHash !== null && entry.hash === headHash)
+                      // 只有一个空心圆：有未提交行时空心归它，否则归当前 HEAD。
+                      const hollow = entry.uncommitted === true
+                        || (hasUncommitted === false && headHash !== null && entry.hash === headHash)
                       return E('circle', {
                         key: 'c' + String(index),
                         cx: layout.rowLane[index] * LANE_W + 12,
@@ -1333,6 +1447,7 @@ window.__ModuleLoader__.load({
                     entry: entry,
                     y: offsets.list[index],
                     laneWidth: laneWidth,
+                    color: laneColor(layout.rowColor[index]),
                     t: t,
                     selected: selected === entry.hash,
                     onClick: entry.uncommitted === true ? null : () => { void selectCommit(entry) },
