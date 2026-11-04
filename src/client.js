@@ -100,7 +100,9 @@ window.__ModuleLoader__.load({
 .gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; box-sizing:border-box;
   border-radius:4px; border-radius:var(--dsw-radius-xs, 4px); border:1px solid transparent;
   background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); color:var(--gw-ref-ink, #fff);
-  font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
+  font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden;
+  white-space:nowrap; }
+.gw-ref-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gw-ref-head { font-weight:600; }
 .gw-ref-remote { border-style:dashed; border-color:var(--gw-ref-ink); }
 .gw-ref-tag { border-style:solid; border-color:var(--gw-ref-ink); }
@@ -640,7 +642,8 @@ window.__ModuleLoader__.load({
       else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
       else { cls += ' gw-ref-branch' }
       const style = { '--gw-ref-fill': chain, '--gw-ref-ink': readableOn(chain) }
-      return E('span', { className: cls, style: style, title: label }, label)
+      return E('span', { className: cls, style: style, title: label },
+        E('span', { className: 'gw-ref-label' }, label))
     }
 
 
