@@ -12,7 +12,7 @@
  * 或浏览器标记为同源（Sec-Fetch-Site）的请求才会被处理——跨站页面无法伪造这两个头。
  */
 
-import { existsSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { GitError, gitText, gitTextQuiet, messageOf, runGit } from './git-run.js'
@@ -453,6 +453,36 @@ async function dropCommit(payload) {
   return { hash }
 }
 
+/* ---------------------------- 忽略规则 ---------------------------- */
+
+/** 把路径追加进 .gitignore；已存在的规则不重复写。 */
+async function ignore(payload) {
+  const cwd = requireCwd(payload)
+  const paths = pathList(payload.paths)
+  const file = path.join(cwd, '.gitignore')
+  let existing = ''
+  try {
+    existing = readFileSync(file, 'utf8')
+  } catch (error) {
+    if (error !== null && error !== undefined && error.code !== 'ENOENT') {
+      throw new GitError('读取 .gitignore 失败：' + messageOf(error), 'ignore-failed', 500)
+    }
+    existing = ''
+  }
+  const known = new Set(existing.split('\n').map((line) => line.trim()))
+  const added = []
+  for (const path of paths) {
+    const rule = '/' + path
+    if (known.has(rule) || known.has(path)) continue
+    known.add(rule)
+    added.push(rule)
+  }
+  if (added.length === 0) return { added: [] }
+  const tail = existing === '' || existing.endsWith('\n') ? '' : '\n'
+  writeFileSync(file, existing + tail + added.join('\n') + '\n', 'utf8')
+  return { added: added }
+}
+
 /* ---------------------------- 远程同步 ---------------------------- */
 
 /** 网络类操作给足时间，但仍设上限：卡在认证提示时不该把面板吊死。 */
@@ -516,7 +546,7 @@ async function push(payload) {
 /* ============================== 方法表与 HTTP ============================== */
 
 const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes }
-const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit }
+const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit, ignore }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 
 function headerOf(req, nameOfHeader) {

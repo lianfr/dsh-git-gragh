@@ -39,13 +39,15 @@ window.__ModuleLoader__.load({
   font:inherit; font-size:12px; border-radius:6px; cursor:pointer; white-space:nowrap;
   border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
   color:var(--dsw-alias-label-primary); }
-.gw-btn:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-btn:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-btn:disabled { opacity:.45; cursor:default; }
 .gw-btn-primary { border-color:transparent; background:var(--dsw-alias-button-primary-fill);
   color:var(--dsw-alias-label-primary-inverted); }
 .gw-btn-primary:hover { background:var(--dsw-alias-button-primary-hover); }
 .gw-btn-ghost { border-color:transparent; background:transparent; color:var(--dsw-alias-label-secondary); }
-.gw-btn-ghost:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-btn-ghost:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-btn-sm { height:20px; padding:0 7px; font-size:11px; }
 
 .gw-check { display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none;
@@ -61,7 +63,8 @@ window.__ModuleLoader__.load({
 .gw-group-actions { flex:none; display:flex; align-items:center; gap:2px; }
 .gw-group-head { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
-.gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-group-head .gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l1);
   margin-left:13px; padding-left:4px; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
@@ -105,10 +108,17 @@ window.__ModuleLoader__.load({
   padding:0 0 8px 0; min-height:30px; flex:none; }
 .gw-bar-title { font-size:14px; font-weight:600; color:var(--dsw-alias-label-primary);
   margin-right:1px; }
+.gw-act { display:flex; align-items:center; justify-content:center; flex:none;
+  width:20px; height:20px; padding:0; border:none; border-radius:4px; background:transparent;
+  color:var(--dsw-alias-label-tertiary); cursor:pointer; opacity:0; }
+.gw-row:hover .gw-act, .gw-file:hover .gw-act, .gw-group-head:hover .gw-act { opacity:1; }
+.gw-act:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
   width:24px; height:24px; padding:0; border:none; border-radius:5px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
-.gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
+.gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
 .gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
@@ -385,6 +395,9 @@ window.__ModuleLoader__.load({
         showOutput: '显示 Git 输出',
         remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
+        openFile: '打开文件',
+        ignoreFile: '加入忽略',
+        ignoreAll: '全部加入忽略',
         remoteEmpty: '还没有配置远程仓库',
         remoteAdd: '添加远程',
         remoteEdit: '编辑',
@@ -514,6 +527,9 @@ window.__ModuleLoader__.load({
         showOutput: 'Show Git output',
         remotes: 'Remotes',
         openInTerminal: 'Open repository in terminal',
+        openFile: 'Open file',
+        ignoreFile: 'Add to .gitignore',
+        ignoreAll: 'Add all to .gitignore',
         remoteEmpty: 'No remotes configured',
         remoteAdd: 'Add remote',
         remoteEdit: 'Edit',
@@ -1135,25 +1151,19 @@ window.__ModuleLoader__.load({
           parts.name),
 
         E('span', { className: 'gw-file-actions' },
-          untracked || !staged
-            ? E('button', {
-                className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                title: t('stage'),
-                onClick: (event) => { event.stopPropagation(); props.onStage(item) },
-              }, '＋')
+          E(ActionIcon, { name: 'open', title: t('openFile'), onClick: () => props.onOpen(item) }),
+          props.group === 'staged'
+            ? E(ActionIcon, { name: 'unstage', title: t('unstage'), onClick: () => props.onUnstage(item) })
             : null,
-          staged
-            ? E('button', {
-                className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                title: t('unstage'),
-                onClick: (event) => { event.stopPropagation(); props.onUnstage(item) },
-              }, '－')
+          props.group === 'untracked'
+            ? E(ActionIcon, { name: 'ignore', title: t('ignoreFile'), onClick: () => props.onIgnore([item.path]) })
             : null,
-          E('button', {
-            className: 'gw-btn gw-btn-ghost gw-btn-sm',
-            title: t('discard'),
-            onClick: (event) => { event.stopPropagation(); props.onDiscard(item) },
-          }, '⤺')))
+          props.group === 'untracked' || props.group === 'unstaged'
+            ? E(ActionIcon, { name: 'discard', title: t('discard'), onClick: () => props.onDiscard(item) })
+            : null,
+          props.group === 'untracked' || props.group === 'unstaged'
+            ? E(ActionIcon, { name: 'stage', title: t('stage'), onClick: () => props.onStage(item) })
+            : null))
     }
 
     /** 把扁平的路径表折成树：中间节点是目录，叶子才是真的文件。 */
@@ -1268,6 +1278,7 @@ window.__ModuleLoader__.load({
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
+              onIgnore: props.onIgnore,
             })))
     }
 
@@ -1726,6 +1737,55 @@ window.__ModuleLoader__.load({
         })
       }, [cwd, run, refreshSummary, t])
 
+      const doDiscardAll = useCallback((items) => {
+        if (items.length === 0) return
+        const ok = window.confirm(t('discardAllConfirm', { count: String(items.length) }))
+        if (!ok) return
+        void run(async () => {
+          await api('discard', { cwd: cwd, paths: items.map((item) => item.path), confirm: true })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary, t])
+
+      const doIgnore = useCallback((paths) => {
+        if (paths.length === 0) return
+        void run(async () => {
+          await api('ignore', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      const doStageAll = useCallback((paths) => {
+        void run(async () => {
+          await api('stage', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      const doUnstageAll = useCallback((paths) => {
+        void run(async () => {
+          await api('unstage', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      /** 每组标题上的批量动作，悬停才出现；冲突组没有批量操作。 */
+      const groupActions = useCallback((group, items) => {
+        const paths = items.map((item) => item.path)
+        if (group === 'staged') {
+          return E(ActionIcon, { name: 'unstage', title: t('unstageAll'), onClick: () => doUnstageAll(paths) })
+        }
+        if (group === 'unstaged') {
+          return E('span', { style: { display: 'flex', gap: '1px' } },
+            E(ActionIcon, { name: 'discard', title: t('discardAll'), onClick: () => doDiscardAll(items) }),
+            E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
+        }
+        return E('span', { style: { display: 'flex', gap: '1px' } },
+          E(ActionIcon, { name: 'ignore', title: t('ignoreAll'), onClick: () => doIgnore(paths) }),
+          E(ActionIcon, { name: 'discard', title: t('discardAll'), onClick: () => doDiscardAll(items) }),
+          E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
+      }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore])
+
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
         if (error === null) return undefined
@@ -1789,20 +1849,6 @@ window.__ModuleLoader__.load({
         })
       }, [cwd, run, refreshAll, syncBusy])
 
-
-      const doStageAll = useCallback((paths) => {
-        void run(async () => {
-          await api('stage', { cwd: cwd, paths: paths })
-          await refreshSummary()
-        })
-      }, [cwd, run, refreshSummary])
-
-      const doUnstageAll = useCallback((paths) => {
-        void run(async () => {
-          await api('unstage', { cwd: cwd, paths: paths })
-          await refreshSummary()
-        })
-      }, [cwd, run, refreshSummary])
 
       const doCommit = useCallback(() => {
         if (message.trim() === '' && amend === false) { setError(t('emptyMsg')); return }
@@ -2097,77 +2143,6 @@ window.__ModuleLoader__.load({
           ],
         }))
 
-      const top = E('div', { className: 'gw-top' },
-        E('div', { className: 'gw-pad' },
-          error === null ? null : E('div', { className: 'gw-err', key: error },
-            E('span', { className: 'gw-err-text' }, error),
-            E('button', {
-              className: 'gw-err-close',
-              'aria-label': t('close'),
-              onClick: () => setError(null),
-            }, '×')),
-          changeBar,
-          E('textarea', {
-            className: 'gw-textarea',
-            placeholder: t('commitPlaceholder'),
-            value: message,
-            spellCheck: false,
-            onChange: (event) => setMessage(event.target.value),
-            onKeyDown: onKeyDown,
-          }),
-          E('div', { className: 'gw-compose-actions' },
-            E('button', {
-              className: 'gw-btn gw-btn-primary',
-              disabled: busy || (!isRepo),
-              onClick: doCommit,
-              title: '⌘/Ctrl + Enter',
-            }, t('commit')),
-            E('label', { className: 'gw-check' },
-              E('input', { type: 'checkbox', checked: amend, onChange: (event) => setAmend(event.target.checked) }),
-              t('commitAmend')))),
-        E('div', { className: 'gw-changes' },
-          summary === null
-            ? E('div', { className: 'gw-empty' }, t('loading'))
-            : changes.length === 0
-              ? null
-              : E('div', null,
-                  E(ChangeGroup, {
-                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('conflicts'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                  }),
-                  E(ChangeGroup, {
-                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('staged'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: staged.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doUnstageAll(staged.map((item) => item.path)) },
-                    }, t('unstageAll')),
-                  }),
-                  E(ChangeGroup, {
-                    group: 'unstaged', title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('changes'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: unstaged.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doStageAll(unstaged.map((item) => item.path)) },
-                    }, t('stageAll')),
-                  }),
-                  E(ChangeGroup, {
-                    group: 'untracked', title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('untracked'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: untracked.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doStageAll(untracked.map((item) => item.path)) },
-                    }, t('stageAll')),
-                  }))))
-
       const head = E('div', { className: 'gw-graph-head' },
         E('span', { className: 'gw-branch' },
           E('svg', { width: 12, height: 12, viewBox: '0 0 16 16', fill: 'currentColor' },
@@ -2226,6 +2201,69 @@ window.__ModuleLoader__.load({
           onClick: () => { void refreshAll() },
           path: 'M13 8a5 5 0 1 1-1.5-3.6M13.2 2.6v3.2h-3.2',
         }))
+
+      const top = E('div', { className: 'gw-top' },
+        E('div', { className: 'gw-pad' },
+          error === null ? null : E('div', { className: 'gw-err', key: error },
+            E('span', { className: 'gw-err-text' }, error),
+            E('button', {
+              className: 'gw-err-close',
+              'aria-label': t('close'),
+              onClick: () => setError(null),
+            }, '×')),
+          changeBar,
+          E('textarea', {
+            className: 'gw-textarea',
+            placeholder: t('commitPlaceholder'),
+            value: message,
+            spellCheck: false,
+            onChange: (event) => setMessage(event.target.value),
+            onKeyDown: onKeyDown,
+          }),
+          E('div', { className: 'gw-compose-actions' },
+            E('button', {
+              className: 'gw-btn gw-btn-primary',
+              disabled: busy || (!isRepo),
+              onClick: doCommit,
+              title: '⌘/Ctrl + Enter',
+            }, t('commit')),
+            E('label', { className: 'gw-check' },
+              E('input', { type: 'checkbox', checked: amend, onChange: (event) => setAmend(event.target.checked) }),
+              t('commitAmend')))),
+        E('div', { className: 'gw-changes' },
+          summary === null
+            ? E('div', { className: 'gw-empty' }, t('loading'))
+            : changes.length === 0
+              ? null
+              : E('div', null,
+                  E(ChangeGroup, {
+                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
+                    action: null,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('conflicts'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
+                    action: groupActions('staged', staged),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('staged'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'unstaged', title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
+                    action: groupActions('unstaged', unstaged),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('changes'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'untracked', title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
+                    action: groupActions('untracked', untracked),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('untracked'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }))))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
       const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
@@ -2397,6 +2435,29 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------------ */
     /* registration                                                        */
     /* ------------------------------------------------------------------ */
+
+    /** 行内动作图标：细线风格，跟图头那排一致，只在悬停时出现。 */
+    const ACTION_PATHS = {
+      open: ['M4 1.8h5.2L12 4.6v9.6H4z', 'M9.2 1.8v2.8H12', 'M6.2 7.4L6.2 7.4'],
+      stage: ['M4 1.8h5.2L12 4.6v9.6H4z', 'M9.2 1.8v2.8H12', 'M8 7.6v3.6M6.2 9.4h3.6'],
+      unstage: ['M4 1.8h5.2L12 4.6v9.6H4z', 'M9.2 1.8v2.8H12', 'M6.2 9.4h3.6'],
+      discard: ['M4.6 5.4H2.4V3.2', 'M2.6 5.2a5.4 5.4 0 1 1-1 3.4'],
+      ignore: ['M8 2.4a5.6 5.6 0 1 0 0 11.2A5.6 5.6 0 0 0 8 2.4z', 'M4.2 11.8 11.8 4.2'],
+    }
+
+    function ActionIcon(props) {
+      const paths = ACTION_PATHS[props.name] === undefined ? ACTION_PATHS.open : ACTION_PATHS[props.name]
+      return E('button', {
+        className: 'gw-act',
+        title: props.title,
+        onClick: (event) => { event.stopPropagation(); props.onClick(event) },
+      },
+        E('svg', {
+          width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+          strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round',
+        },
+          paths.map((d, index) => E('path', { key: 'p' + String(index), d: d }))))
+    }
 
     /** 图头那一排小图标按钮：统一 22px 热区、14px 图形，忙时换成省略号。 */
     function iconButton(props) {
