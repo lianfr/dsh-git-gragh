@@ -112,6 +112,14 @@ window.__ModuleLoader__.load({
   width:20px; height:20px; padding:0; border:none; border-radius:4px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; opacity:0; }
 .gw-row:hover .gw-act, .gw-file:hover .gw-act, .gw-group-head:hover .gw-act { opacity:1; }
+.gw-act { position:relative; }
+.gw-act::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
+  padding:5px 8px; border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
+  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  font-size:11px; line-height:1.3; white-space:nowrap; pointer-events:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.28); opacity:0; visibility:hidden;
+  transition:opacity .12s ease, visibility .12s ease; z-index:10000; }
+.gw-act:hover::after { opacity:1; visibility:visible; }
 .gw-act:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
@@ -1253,9 +1261,10 @@ window.__ModuleLoader__.load({
         E('div', { className: 'gw-group-head', onClick: props.onToggle },
           E('span', { className: 'gw-caret' }, props.open ? '▾' : '▸'),
           E('span', { className: 'gw-group-title' }, props.title),
-          E('span', { className: 'gw-badge' }, String(items.length)),
+          E('span', { className: 'gw-spacer' }),
           E('span', { className: 'gw-group-actions' },
-            props.action === undefined || props.action === null ? null : props.action)),
+            props.action === undefined || props.action === null ? null : props.action),
+          E('span', { className: 'gw-badge' }, String(items.length))),
         props.open === false ? null : props.tree === true
           ? buildTree(items).map((node, index) => E(TreeRow, {
               key: 't' + String(index),
@@ -2449,7 +2458,7 @@ window.__ModuleLoader__.load({
       const paths = ACTION_PATHS[props.name] === undefined ? ACTION_PATHS.open : ACTION_PATHS[props.name]
       return E('button', {
         className: 'gw-act',
-        title: props.title,
+        'data-tip': props.title,
         onClick: (event) => { event.stopPropagation(); props.onClick(event) },
       },
         E('svg', {
