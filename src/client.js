@@ -107,8 +107,9 @@ window.__ModuleLoader__.load({
 .gw-ref { display:inline-flex; align-items:stretch; height:15px; flex:none; max-width:150px;
   overflow:hidden; box-sizing:border-box;
   border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
-  border:1px solid var(--dsw-alias-border-l2);
-  background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+  border:1px solid transparent;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent); }
+.gw-ref-remote, .gw-ref-tag, .gw-ref-stash { border-color:var(--dsw-alias-border-l2); }
 .gw-ref-flag { width:5px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
 .gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.4; }
 .gw-ref-label { display:block; min-width:0; padding:0 5px 0 5px; overflow:hidden;
