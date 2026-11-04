@@ -108,11 +108,14 @@ window.__ModuleLoader__.load({
   background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
 .gw-ref-remote .gw-ref-flag {
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
-/* 只有标签与 stash 改成空心：只描边不填色，其余类型仍是实心块。 */
-.gw-ref-tag .gw-ref-flag { background:transparent;
-  border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
-.gw-ref-stash .gw-ref-flag { background:transparent;
-  border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+/* 标签与 stash 是特殊类型：整块用四成透明的链色描边，内部照常是中性文字与统一底色。 */
+.gw-ref-tag, .gw-ref-stash {
+  --gw-ref-edge:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+.gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag {
+  background:transparent; border-color:var(--gw-ref-edge); }
+.gw-ref-tag .gw-ref-label, .gw-ref-stash .gw-ref-label,
+.gw-ref-tag .gw-ref-kind, .gw-ref-stash .gw-ref-kind,
+.gw-ref-tag .gw-ref-remotes, .gw-ref-stash .gw-ref-remotes { border-color:var(--gw-ref-edge); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0; overflow:hidden;
   box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
   border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
