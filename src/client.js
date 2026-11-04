@@ -2024,7 +2024,9 @@ window.__ModuleLoader__.load({
           title: treeView === true ? t('flatView') : t('treeView'),
           active: treeView === true,
           onClick: () => setTreeView(treeView === false),
-          path: treeView === true ? 'M3 4h10M3 8h10M3 12h10' : 'M4 3v10M4 6h5M4 11h5',
+          path: treeView === true
+            ? 'M3 4h10M3 8h10M3 12h10'
+            : 'M2.6 3h1.8M6.4 3h7M5.2 8h1.8M9 8h4.4M7.8 13h1.8M11.6 13h1.8',
         }),
         iconButton({
           title: t('remotes'),
@@ -2034,7 +2036,16 @@ window.__ModuleLoader__.load({
         iconButton({
           title: t('settings'),
           onClick: () => setSettingsOpen(true),
-          path: 'M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM8 2.2l.6 1.5 1.6-.4 1 1.3-.9 1.4.9 1.4-1 1.3-1.6-.4-.6 1.5H6.9l-.6-1.5-1.6.4-1-1.3.9-1.4-.9-1.4L4.7 3.3l1.6.4L6.9 2.2z',
+          path: '',
+          extra: [
+            E('circle', { key: 'o', cx: 8, cy: 8, r: 1.9 }),
+            E('circle', { key: 'r', cx: 8, cy: 8, r: 4.6 }),
+            E('path', {
+              key: 't',
+              d: 'M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2'
+                + 'M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M12.7 3.3l-1.4 1.4M4.7 11.3l-1.4 1.4',
+            }),
+          ],
         }),
         iconButton({
           title: t('moreActions'),
@@ -2045,9 +2056,9 @@ window.__ModuleLoader__.load({
           },
           path: '',
           extra: [
-            E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '1', cx: 8, cy: 3.4, r: 1.1, fill: 'currentColor' }),
             E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
-            E('circle', { key: '3', cx: 12.6, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '3', cx: 8, cy: 12.6, r: 1.1, fill: 'currentColor' }),
           ],
         }))
 
