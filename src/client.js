@@ -394,6 +394,14 @@ window.__ModuleLoader__.load({
 
       const laneLast = []
       const laneShift = []
+      const laneOfRow = new Array(entries.length).fill(-1)
+
+      const fillRows = (chainIndex) => {
+        const chain = chains[chainIndex]
+        for (let i = 0; i < entries.length; i++) {
+          if (chainOf[i] === chainIndex) laneOfRow[i] = chain.lane
+        }
+      }
 
       const takeLane = (chainIndex) => {
         const chain = chains[chainIndex]
@@ -402,21 +410,34 @@ window.__ModuleLoader__.load({
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
           chain.color = 0
+          fillRows(chainIndex)
           return
         }
-        for (let j = 1; j < laneLast.length; j++) {
+        // 分支一律向右分叉：新链要落在它分出去的那条分支所在列的右边，
+        // 只有合并的连线才会往左收。取链尾的父提交——那才是它接回主线的位置，
+        // 链首的父通常就在本链内部。
+        const tailParents = Array.isArray(entries[chain.last].parents) ? entries[chain.last].parents : []
+        const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
+        const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
+        const fatherLane = fatherChain >= 0 && fatherChain !== chainIndex ? laneOfRow[fatherRow] : -1
+        const start = Math.max(1, fatherLane + 1)
+
+        for (let j = start; j < laneLast.length; j++) {
           if (chain.first > laneLast[j] + 1) {
             chain.lane = j
             chain.color = j + laneShift[j]
             laneLast[j] = chain.last
             laneShift[j] += 1
+            fillRows(chainIndex)
             return
           }
         }
+        while (laneLast.length < start) { laneLast.push(-1); laneShift.push(0) }
         laneLast.push(chain.last)
         laneShift.push(0)
         chain.lane = laneLast.length - 1
         chain.color = chain.lane
+        fillRows(chainIndex)
       }
 
       const rest = []
