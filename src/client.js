@@ -423,7 +423,7 @@ window.__ModuleLoader__.load({
         const start = Math.max(1, fatherLane + 1)
 
         for (let j = start; j < laneLast.length; j++) {
-          if (chain.first > laneLast[j] + 1) {
+          if (chain.first > laneLast[j]) {
             chain.lane = j
             chain.color = j + laneShift[j]
             laneLast[j] = chain.last
@@ -459,7 +459,7 @@ window.__ModuleLoader__.load({
         const baseRow = stashParents.length > 0 ? rowOfHash.get(stashParents[0]) : undefined
         const baseChain = baseRow === undefined ? -1 : chainOf[baseRow]
         if (baseChain < 0 || baseChain === index) continue
-        const at = chains[baseChain].lane
+        const at = chains[baseChain].lane + 1
         if (chains[index].lane === at) continue
         for (let other = 0; other < chains.length; other++) {
           if (other !== index && chains[other].lane >= at) chains[other].lane += 1
