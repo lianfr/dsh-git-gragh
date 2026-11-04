@@ -89,7 +89,14 @@ window.__ModuleLoader__.load({
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-row-sel, .gw-row-sel:hover { background:var(--dsw-alias-interactive-bg-active);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
-.gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+.gw-row-subject { overflow:hidden; white-space:nowrap; flex:1 1 auto; }
+.gw-row-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-row:hover .gw-row-text { width:max-content; text-overflow:clip;
+  animation:gw-row-marquee 4.5s ease-in-out infinite alternate; }
+@keyframes gw-row-marquee {
+  from { transform:translateX(0); }
+  to { transform:translateX(min(0px, calc(-100% + 160px))); }
+}
 .gw-row-ghost { cursor: default; }
     .gw-row-ghost .gw-row-subject { color: var(--dsw-alias-label-secondary); }
     .gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
@@ -102,11 +109,17 @@ window.__ModuleLoader__.load({
   border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
   border:1px solid var(--dsw-alias-border-l2);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
-.gw-ref-flag { width:4px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
-.gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.55; }
-.gw-ref-label { display:flex; align-items:center; min-width:0; padding:0 5px 0 4px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font-size:10px; font-weight:500; color:var(--dsw-alias-label-secondary); }
+.gw-ref-flag { width:5px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.4; }
+.gw-ref-label { display:block; min-width:0; padding:0 5px 0 5px; overflow:hidden;
+  font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary); }
+.gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
+  animation:gw-ref-marquee 4s ease-in-out infinite alternate; }
+@keyframes gw-ref-marquee {
+  from { transform:translateX(0); }
+  to { transform:translateX(min(0px, calc(-100% + 120px))); }
+}
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
 .gw-ref-remote .gw-ref-label { font-style:italic; }
 
@@ -634,7 +647,7 @@ window.__ModuleLoader__.load({
       else { cls += ' gw-ref-branch' }
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
-        E('span', { className: 'gw-ref-label' }, label))
+        E('span', { className: 'gw-ref-label' }, E('span', { className: 'gw-ref-text' }, label)))
     }
 
 
@@ -712,7 +725,7 @@ window.__ModuleLoader__.load({
           style: { top: y + 'px', height: ROW_H + 'px', paddingLeft: props.laneWidth + 'px' },
           title: entry.subject,
         },
-          E('span', { className: 'gw-row-subject' }, entry.subject))
+          E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)))
       }
       return E('div', {
         className: 'gw-row' + (props.selected ? ' gw-row-sel' : ''),
@@ -722,7 +735,7 @@ window.__ModuleLoader__.load({
         title: entry.subject,
       },
         refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref, color: props.color })),
-        E('span', { className: 'gw-row-subject' }, entry.subject),
+        E('span', { className: 'gw-row-subject' }, E('span', { className: 'gw-row-text' }, entry.subject)),
         E('span', { className: 'gw-row-meta' },
           E('span', null, entry.author),
           E('span', { className: 'gw-row-sep' }, '·'),
