@@ -558,10 +558,10 @@ window.__ModuleLoader__.load({
         onContextMenu: props.onContextMenu,
         title: entry.subject,
       },
-        E('span', { className: 'gw-row-hash' }, entry.short),
         refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
-        E('span', { className: 'gw-row-meta' }, entry.author + ' · ' + relativeTime(entry.time, t)))
+        E('span', { className: 'gw-row-meta' }, entry.author + ' · ' + relativeTime(entry.time, t)),
+        E('span', { className: 'gw-row-hash' }, entry.short))
     }
 
     function DiffPane(props) {
