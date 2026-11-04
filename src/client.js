@@ -297,23 +297,23 @@ window.__ModuleLoader__.load({
         description: '提交图与变更管理',
         commitPlaceholder: '提交信息',
         commit: '提交',
-        commitAmend: 'Amend 上一次提交',
-        staged: 'Staged',
+        commitAmend: '修补上一次提交',
+        staged: '已暂存',
         changes: '更改',
         untracked: '未跟踪',
         conflicts: '合并冲突',
-        stageAll: '全部 Stage',
+        stageAll: '全部暂存',
         moreActions: '更多操作',
         refresh: '刷新',
         viewAll: '全览',
         viewFocus: '聚焦当前分支',
         locate: '定位到当前提交',
-        fetchAll: 'Fetch 全部远程',
-        pull: 'Pull',
-        push: 'Push',
+        fetchAll: '获取全部远程更新',
+        pull: '拉取',
+        push: '推送',
         publish: '发布分支',
         syncRunning: '正在执行…',
-        remotes: 'Remote 仓库',
+        remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
         remoteEmpty: '还没有配置远程仓库',
         remoteAdd: '添加远程',
@@ -325,12 +325,12 @@ window.__ModuleLoader__.load({
         save: '保存',
         cancel: '取消',
         close: '关闭',
-        unstageAll: '全部 Unstage',
-        stage: 'Stage',
-        unstage: 'Unstage',
-        discard: 'Discard',
-        discardConfirm: '确定 Discard 对 {path} 的更改？此操作无法撤销。',
-        discardAllConfirm: '确定 Discard 全部未暂存的更改？此操作无法撤销。',
+        unstageAll: '全部取消暂存',
+        stage: '暂存',
+        unstage: '取消暂存',
+        discard: '放弃更改',
+        discardConfirm: '确定放弃对 {path} 的更改？此操作无法撤销。',
+        discardAllConfirm: '确定放弃全部未暂存的更改？此操作无法撤销。',
         noChanges: '工作区干净',
         uncommitted: '未提交的更改',
         noCommits: '还没有提交',
@@ -340,29 +340,41 @@ window.__ModuleLoader__.load({
         createBranchAt: '在提交 {hash} 上新建分支',
         addTagAt: '在提交 {hash} 上新建标签',
         nameLabel: '名称',
-        checkoutAfter: 'Checkout',
+        checkoutAfter: '创建后切换过去',
         createBranch: '创建分支',
         createTag: '创建标签',
         addTag: '新建标签…',
-        cherryPickHere: 'Cherry-pick 此提交…',
-        revertHere: 'Revert 此提交…',
-        dropHere: 'Drop 此提交…',
-        mergeIntoCurrent: 'Merge 进当前分支…',
-        rebaseOntoHere: '把当前分支 Rebase 到此提交…',
-        resetToHere: '把当前分支 Reset 到此提交…',
-        pickHint: '双击 Checkout',
+        cherryPickHere: '拣选此提交…',
+        revertHere: '还原此提交…',
+        dropHere: '删除此提交…',
+        mergeIntoCurrent: '合并到当前分支…',
+        rebaseOntoHere: '把当前分支变基到此提交…',
+        resetToHere: '把当前分支重置到此提交…',
+        pickHint: '双击检出',
         copyHash: '复制完整哈希',
         copySubject: '复制提交信息',
         save: '保存',
         ok: '确定',
+        resetTitle: '把当前分支重置到提交 {hash}？',
+        resetKind: '重置方式',
+        resetSoft: 'Soft — 保留全部改动，只移动 HEAD',
+        resetMixed: 'Mixed — 保留工作区，重置暂存区',
+        resetHard: 'Hard — 丢弃全部改动',
+        confirmReset: '重置',
+        revertTitle: '还原提交 {hash}？',
+        dropTitle: '永久删除提交 {hash}？',
+        rebaseTitle: '把当前分支变基到提交 {hash}？',
+        confirmRevert: '还原',
+        confirmDrop: '删除',
+        confirmRebase: '变基',
         revertNote: '会新建一个提交来抵消「{subject}」的改动。',
         dropNote: '「{subject}」将从历史里移除，之后所有提交的哈希都会变。',
         rebaseNote: '当前分支的提交会接到这个提交之后，历史会被改写。',
         resetNote: '当前分支会退到这个提交，工作区与暂存区的改动都会丢失。',
-        checkoutHere: 'Checkout 到此提交',
+        checkoutHere: '检出到此提交',
         branchHere: '在此新建分支',
         branchPrompt: '新分支名称',
-        detached: 'detached HEAD',
+        detached: '游离 HEAD',
         notRepo: '不是仓库',
         back: '返回',
         error: '出错了',
@@ -435,6 +447,18 @@ window.__ModuleLoader__.load({
         copySubject: 'Copy commit message',
         save: 'Save',
         ok: 'OK',
+        resetTitle: 'Reset current branch to {hash}?',
+        resetKind: 'Reset mode',
+        resetSoft: 'Soft — keep all changes, only move HEAD',
+        resetMixed: 'Mixed — keep working tree, reset the index',
+        resetHard: 'Hard — discard all changes',
+        confirmReset: 'Reset',
+        revertTitle: 'Revert commit {hash}?',
+        dropTitle: 'Permanently drop commit {hash}?',
+        rebaseTitle: 'Rebase current branch onto {hash}?',
+        confirmRevert: 'Revert',
+        confirmDrop: 'Drop',
+        confirmRebase: 'Rebase',
         revertNote: 'Creates a new commit undoing "{subject}".',
         dropNote: '"{subject}" will be removed from history; later hashes change.',
         rebaseNote: 'Current branch commits will be replayed onto this commit.',
@@ -1139,11 +1163,15 @@ window.__ModuleLoader__.load({
       const t = props.t
       const [value, setValue] = useState(props.initial === undefined ? '' : props.initial)
       const [checked, setChecked] = useState(props.checked === true)
+      const options = Array.isArray(props.options) ? props.options : []
+      const [picked, setPicked] = useState(
+        options.length === 0 ? '' : String(props.selectValue === undefined ? options[0].value : props.selectValue),
+      )
       const hasInput = props.input === true
 
       const confirm = () => {
         if (hasInput && value.trim() === '') return
-        props.onOk({ text: value.trim(), checked: checked })
+        props.onOk({ text: value.trim(), checked: checked, select: picked })
       }
 
       return E('div', {
@@ -1163,6 +1191,13 @@ window.__ModuleLoader__.load({
                 onChange: (event) => setValue(event.target.value),
                 onKeyDown: (event) => { if (event.key === 'Enter') confirm() },
               })) : null,
+            options.length === 0 ? null : E('label', { className: 'gw-field' },
+              E('span', null, props.selectLabel === undefined ? '' : props.selectLabel),
+              E('select', {
+                className: 'gw-input',
+                value: picked,
+                onChange: (event) => setPicked(event.target.value),
+              }, options.map((option) => E('option', { key: option.value, value: option.value }, option.name)))),
             props.check === true ? E('label', { className: 'gw-check' },
               E('input', {
                 type: 'checkbox',
@@ -1730,39 +1765,45 @@ window.__ModuleLoader__.load({
         if (kind === 'merge') { perform('mergeCommit')(); return }
         if (kind === 'revert') {
           setAsk({
-            title: t('revertHere'),
+            title: t('revertTitle', { hash: entry.short }),
             note: t('revertNote', { subject: entry.subject }),
-            confirmLabel: t('ok'),
+            confirmLabel: t('confirmRevert'),
             run: perform('revertCommit'),
           })
           return
         }
         if (kind === 'drop') {
           setAsk({
-            title: t('dropHere'),
+            title: t('dropTitle', { hash: entry.short }),
             note: t('dropNote', { subject: entry.subject }),
             danger: true,
-            confirmLabel: t('dropHere'),
+            confirmLabel: t('confirmDrop'),
             run: perform('dropCommit', { confirm: true }),
           })
           return
         }
         if (kind === 'rebase') {
           setAsk({
-            title: t('rebaseOntoHere'),
+            title: t('rebaseTitle', { hash: entry.short }),
             note: t('rebaseNote'),
-            confirmLabel: t('ok'),
+            confirmLabel: t('confirmRebase'),
             run: perform('rebaseOnto'),
           })
           return
         }
         if (kind === 'reset') {
           setAsk({
-            title: t('resetToHere'),
+            title: t('resetTitle', { hash: entry.short }),
             note: t('resetNote'),
-            danger: true,
-            confirmLabel: t('ok'),
-            run: perform('resetTo', { mode: 'hard', confirm: true }),
+            selectLabel: t('resetKind'),
+            options: [
+              { name: t('resetSoft'), value: 'soft' },
+              { name: t('resetMixed'), value: 'mixed' },
+              { name: t('resetHard'), value: 'hard' },
+            ],
+            selectValue: 'mixed',
+            confirmLabel: t('confirmReset'),
+            run: (values) => perform('resetTo', { mode: values.select, confirm: values.select === 'hard' })(),
           })
         }
       }, [cwd, run, refreshAll, t, onBranch, onCheckout])
@@ -2047,6 +2088,9 @@ window.__ModuleLoader__.load({
           input: ask.input === true,
           inputLabel: ask.inputLabel,
           check: ask.check === true,
+          options: ask.options,
+          selectLabel: ask.selectLabel,
+          selectValue: ask.selectValue,
           checkLabel: ask.checkLabel,
           checked: ask.checked === true,
           note: ask.note,
