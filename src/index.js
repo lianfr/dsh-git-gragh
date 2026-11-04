@@ -179,16 +179,6 @@ async function log(payload) {
   return { entries: hasMore ? entries.slice(0, limit) : entries, hasMore }
 }
 
-/**
- * 提交图：数据和布局一起给。
- *
- * 布局只有在完整历史上算才稳定——少取一条，某条链的父提交就找不到，列会变。
- * 所以这里总是从 HEAD 一路取到底（有上限保护），算完只回传请求窗口内的部分。
- * 前端因此不需要自己算列，翻页、改页大小都不会影响结果。
- */
-const MAX_GRAPH_COMMITS = 20000
-
-
 async function branches(payload) {
   const cwd = requireCwd(payload)
   const raw = await gitText(cwd, ['for-each-ref', '--format=' + BRANCH_FORMAT, 'refs/heads', 'refs/remotes'])
