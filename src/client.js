@@ -104,8 +104,13 @@ window.__ModuleLoader__.load({
   border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
   border:1px solid var(--dsw-alias-border-l2);
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent); }
-.gw-ref-flag { width:5px; flex:none; background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
-.gw-ref-remote .gw-ref-flag, .gw-ref-tag .gw-ref-flag, .gw-ref-stash .gw-ref-flag { opacity:.4; }
+.gw-ref-flag { width:5px; flex:none; box-sizing:border-box;
+  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-remote .gw-ref-flag { opacity:.4; }
+.gw-ref-tag .gw-ref-flag { background:transparent;
+  border:1px solid var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-stash .gw-ref-flag { background:transparent;
+  border:1px solid color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
   font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary); }
 .gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
