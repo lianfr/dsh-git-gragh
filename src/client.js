@@ -80,6 +80,13 @@ window.__ModuleLoader__.load({
 .gw-ahead { color:var(--dsw-alias-state-success-primary); }
 .gw-behind { color:var(--dsw-alias-state-warn-primary); }
 .gw-spacer { flex:1 1 auto; }
+.gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
+  width:22px; height:22px; padding:0; border:none; border-radius:5px; background:transparent;
+  color:var(--dsw-alias-label-tertiary); cursor:pointer; }
+.gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
+.gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
+.gw-icon-on { color:var(--dsw-alias-brand-primary); }
+.gw-icon-on:hover { color:var(--dsw-alias-brand-primary); }
 
 .gw-graph-body { flex:1 1 auto; min-height:0; overflow:auto; position:relative; }
 .gw-canvas { position:relative; }
@@ -203,6 +210,35 @@ window.__ModuleLoader__.load({
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
 .gw-menu-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-menu-sep { height:1px; margin:4px 6px; background:var(--dsw-alias-border-l1); }
+.gw-scrim { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.32);
+  display:flex; align-items:center; justify-content:center; padding:24px; }
+.gw-card { width:100%; max-width:380px; max-height:100%; display:flex; flex-direction:column;
+  border-radius:12px; border-radius:var(--dsw-radius-md, 12px);
+  background:var(--dsw-alias-bg-layer-3); border:1px solid var(--dsw-alias-border-l2);
+  box-shadow:0 16px 40px rgba(0,0,0,.34); overflow:hidden; }
+.gw-card-head { display:flex; align-items:center; gap:8px; padding:10px 12px;
+  border-bottom:1px solid var(--dsw-alias-border-l1); font-size:12px; font-weight:600;
+  color:var(--dsw-alias-label-primary); }
+.gw-card-body { flex:1 1 auto; min-height:0; overflow:auto; padding:6px 0; }
+.gw-card-foot { flex:none; padding:8px 12px; border-top:1px solid var(--dsw-alias-border-l1);
+  display:flex; justify-content:flex-end; gap:6px; }
+.gw-remote { display:flex; align-items:center; gap:8px; padding:6px 12px; }
+.gw-remote:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-remote-name { flex:none; font-size:11.5px; font-weight:600; color:var(--dsw-alias-label-primary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-remote-url { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:10.5px; color:var(--dsw-alias-label-tertiary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-remote-actions { flex:none; display:flex; gap:2px; }
+.gw-form { display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
+.gw-field { display:flex; flex-direction:column; gap:3px; }
+.gw-field > span { font-size:10.5px; color:var(--dsw-alias-label-tertiary); }
+.gw-input { height:26px; padding:0 8px; font-size:11.5px; box-sizing:border-box;
+  border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
+  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-1);
+  color:var(--dsw-alias-label-primary); outline:none;
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.gw-input:focus { border-color:var(--dsw-alias-brand-primary); }
 `
 
     function injectStyles() {
@@ -230,6 +266,27 @@ window.__ModuleLoader__.load({
         untracked: '未跟踪',
         conflicts: '合并冲突',
         stageAll: '全部暂存',
+        moreActions: '更多操作',
+        viewAll: '全览',
+        viewFocus: '聚焦当前分支',
+        locate: '定位到当前提交',
+        fetchAll: '从所有远程拉取',
+        pull: '拉取',
+        push: '推送',
+        publish: '发布分支',
+        syncRunning: '正在执行…',
+        remotes: '远程仓库',
+        openInTerminal: '在终端打开仓库',
+        remoteEmpty: '还没有配置远程仓库',
+        remoteAdd: '添加远程',
+        remoteEdit: '编辑',
+        remoteRemove: '删除',
+        remoteRemoveConfirm: '确定删除远程「{name}」？本地分支不会被动，只是不再跟踪它。',
+        remoteName: '名称',
+        remoteUrl: '地址',
+        save: '保存',
+        cancel: '取消',
+        close: '关闭',
         unstageAll: '全部取消暂存',
         stage: '暂存',
         unstage: '取消暂存',
@@ -268,6 +325,27 @@ window.__ModuleLoader__.load({
         untracked: 'Untracked',
         conflicts: 'Conflicts',
         stageAll: 'Stage all',
+        moreActions: 'More actions',
+        viewAll: 'Show all branches',
+        viewFocus: 'Focus current branch',
+        locate: 'Go to current commit',
+        fetchAll: 'Fetch from all remotes',
+        pull: 'Pull',
+        push: 'Push',
+        publish: 'Publish branch',
+        syncRunning: 'Running…',
+        remotes: 'Remotes',
+        openInTerminal: 'Open repository in terminal',
+        remoteEmpty: 'No remotes configured',
+        remoteAdd: 'Add remote',
+        remoteEdit: 'Edit',
+        remoteRemove: 'Remove',
+        remoteRemoveConfirm: 'Remove remote "{name}"? Local branches stay; they just stop tracking it.',
+        remoteName: 'Name',
+        remoteUrl: 'URL',
+        save: 'Save',
+        cancel: 'Cancel',
+        close: 'Close',
         unstageAll: 'Unstage all',
         stage: 'Stage',
         unstage: 'Unstage',
@@ -734,6 +812,75 @@ window.__ModuleLoader__.load({
 
 
 
+    /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
+    function RemoteDialog(props) {
+      const t = props.t
+      const list = Array.isArray(props.list) ? props.list : []
+      const [draft, setDraft] = useState(null)
+      const [busy, setBusy] = useState(false)
+
+      function submit() {
+        if (draft === null || busy) return
+        if (draft.name.trim() === '' || draft.url.trim() === '') return
+        setBusy(true)
+        Promise.resolve(props.onSave(draft)).then(
+          () => { setBusy(false); setDraft(null) },
+          () => { setBusy(false) },
+        )
+      }
+
+      const form = draft === null ? null : E('div', { className: 'gw-form' },
+        E('label', { className: 'gw-field' }, E('span', null, t('remoteName')),
+          E('input', {
+            className: 'gw-input', value: draft.name, disabled: busy,
+            onChange: (event) => setDraft({ ...draft, name: event.target.value }),
+          })),
+        E('label', { className: 'gw-field' }, E('span', null, t('remoteUrl')),
+          E('input', {
+            className: 'gw-input', value: draft.url, disabled: busy,
+            onChange: (event) => setDraft({ ...draft, url: event.target.value }),
+          })),
+        E('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: '6px' } },
+          E('button', {
+            className: 'gw-btn gw-btn-ghost gw-btn-sm', disabled: busy,
+            onClick: () => setDraft(null),
+          }, t('cancel')),
+          E('button', {
+            className: 'gw-btn gw-btn-primary gw-btn-sm', disabled: busy, onClick: submit,
+          }, t('save'))))
+
+      return E('div', {
+        className: 'gw-scrim',
+        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
+      },
+        E('div', { className: 'gw-card' },
+          E('div', { className: 'gw-card-head' },
+            t('remotes'),
+            E('span', { className: 'gw-spacer' }),
+            E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, '✕')),
+          E('div', { className: 'gw-card-body' },
+            list.length === 0 && draft === null
+              ? E('div', { className: 'gw-empty' }, t('remoteEmpty'))
+              : list.map((item) => E('div', { className: 'gw-remote', key: item.name },
+                  E('span', { className: 'gw-remote-name' }, item.name),
+                  E('span', { className: 'gw-remote-url', title: item.fetchUrl }, item.fetchUrl),
+                  E('div', { className: 'gw-remote-actions' },
+                    E('button', {
+                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
+                      onClick: () => setDraft({ mode: 'edit', name: item.name, url: item.fetchUrl, original: item.name }),
+                    }, t('remoteEdit')),
+                    E('button', {
+                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
+                      onClick: () => { void props.onRemove(item.name) },
+                    }, t('remoteRemove'))))),
+            form),
+          E('div', { className: 'gw-card-foot' },
+            E('button', {
+              className: 'gw-btn gw-btn-sm', disabled: busy,
+              onClick: () => setDraft({ mode: 'add', name: 'origin', url: '', original: '' }),
+            }, t('remoteAdd')))))
+    }
+
     function FileRow(props) {
       const item = props.item
       const t = props.t
@@ -970,6 +1117,11 @@ window.__ModuleLoader__.load({
       const [message, setMessage] = useState('')
       const [amend, setAmend] = useState(false)
       const [selected, setSelected] = useState(null)
+      const [focus, setFocus] = useState(false)
+      const [syncBusy, setSyncBusy] = useState('')
+      const [moreOpen, setMoreOpen] = useState(false)
+      const [remoteOpen, setRemoteOpen] = useState(false)
+      const [remoteList, setRemoteList] = useState([])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
       const [menu, setMenu] = useState(null)
@@ -1163,6 +1315,55 @@ window.__ModuleLoader__.load({
         })
       }, [cwd, run, refreshSummary, t])
 
+      const loadRemotes = useCallback(async () => {
+        try {
+          const data = await api('remotes', { cwd: cwd })
+          if (aliveRef.current) setRemoteList(Array.isArray(data.remotes) ? data.remotes : [])
+        } catch (failure) {
+          if (aliveRef.current) setRemoteList([])
+        }
+      }, [cwd])
+
+      useEffect(() => {
+        if (remoteOpen === false) return undefined
+        void loadRemotes()
+        return undefined
+      }, [remoteOpen, loadRemotes])
+
+      const onRemoteSave = useCallback((draft) => run(async () => {
+        if (draft.mode === 'add') {
+          await api('remoteAdd', { cwd: cwd, name: draft.name, url: draft.url })
+        } else {
+          if (draft.name !== draft.original) {
+            await api('remoteRename', { cwd: cwd, name: draft.original, nextName: draft.name })
+          }
+          await api('remoteSetUrl', { cwd: cwd, name: draft.name, url: draft.url })
+        }
+        await loadRemotes()
+        await refreshSummary()
+      }), [cwd, run, loadRemotes, refreshSummary])
+
+      const onRemoteRemove = useCallback((name) => run(async () => {
+        await api('remoteRemove', { cwd: cwd, name: name })
+        await loadRemotes()
+        await refreshSummary()
+      }), [cwd, run, loadRemotes, refreshSummary])
+
+      /** 网络操作单独记忙标记，避免把整块面板的其它按钮一起锁住。 */
+      const doSync = useCallback((method) => {
+        if (syncBusy !== '') return
+        void run(async () => {
+          setSyncBusy(method)
+          try {
+            await api(method, { cwd: cwd })
+            await refreshAll()
+          } finally {
+            if (aliveRef.current) setSyncBusy('')
+          }
+        })
+      }, [cwd, run, refreshAll, syncBusy])
+
+
       const doStageAll = useCallback((paths) => {
         void run(async () => {
           await api('stage', { cwd: cwd, paths: paths })
@@ -1203,7 +1404,7 @@ window.__ModuleLoader__.load({
       // 未提交的改动单独占一行，形状与提交一致，但不指向任何对象
       const changeTotal = conflicted.length + staged.length + unstaged.length + untracked.length
       const headHash = summary === null || summary.head === undefined ? null : summary.head
-      const rowEntries = useMemo(() => {
+      const allEntries = useMemo(() => {
         if (changeTotal === 0) return entries
         return [{
           hash: UNCOMMITTED_HASH,
@@ -1217,8 +1418,26 @@ window.__ModuleLoader__.load({
         }].concat(entries)
       }, [entries, changeTotal, headHash, t])
 
+      /* 聚焦只留当前分支这一条第一父链，其余提交收起来；全览原样显示。 */
+      const rowEntries = useMemo(() => {
+        if (focus === false || headHash === null) return allEntries
+        const indexed = new Map()
+        for (const item of allEntries) indexed.set(item.hash, item)
+        const keep = new Set()
+        let cursor = headHash
+        while (cursor !== null && indexed.has(cursor) && keep.has(cursor) === false) {
+          keep.add(cursor)
+          const item = indexed.get(cursor)
+          cursor = item.parents === undefined || item.parents.length === 0 ? null : item.parents[0]
+        }
+        if (allEntries[0] !== undefined && allEntries[0].uncommitted === true) keep.add(allEntries[0].hash)
+        const filtered = allEntries.filter((item) => keep.has(item.hash))
+        return filtered.length === 0 ? allEntries : filtered
+      }, [focus, allEntries, headHash])
+
       const layout = useMemo(() => computeLayout(rowEntries), [rowEntries])
       const laneWidth = Math.max(24, layout.laneCount * LANE_W + 16)
+
 
       const offsets = useMemo(() => {
         const list = []
@@ -1233,6 +1452,18 @@ window.__ModuleLoader__.load({
 
       entriesRef.current = rowEntries
       offsetsRef.current = offsets
+
+      const locateHead = useCallback(() => {
+        const node = bodyRef.current
+        if (node === null) return
+        let index = -1
+        for (let i = 0; i < rowEntries.length; i++) {
+          const item = rowEntries[i]
+          if (item.uncommitted === true || (headHash !== null && item.hash === headHash)) { index = i; break }
+        }
+        if (index < 0) return
+        node.scrollTop = Math.max(0, offsets.list[index] - 8)
+      }, [rowEntries, headHash, offsets])
 
       // 列表替换后把锚点那一行对回原来的滚动位置；用户停在顶部时不干预
       useLayoutEffect(() => {
@@ -1364,11 +1595,50 @@ window.__ModuleLoader__.load({
         summary !== null && summary.behind > 0 ? E('span', { className: 'gw-behind' }, '↓' + String(summary.behind)) : null,
         E('span', { className: 'gw-spacer' }),
         E('span', { className: 'gw-count' }, entries.length + ' / ' + (hasMore ? '…' : entries.length)),
-        E('button', {
-          className: 'gw-btn gw-btn-ghost gw-btn-sm',
+        iconButton({
+          title: focus === true ? t('viewAll') : t('viewFocus'),
+          active: focus === true,
+          onClick: () => setFocus(focus === false),
+          path: focus === true ? 'M8 2v12M8 7h4' : 'M4 2v12M8 2v12M12 2v12',
+        }),
+        iconButton({
+          title: t('locate'),
+          onClick: locateHead,
+          path: 'M8 3v10M3 8h10',
+          extra: E('circle', { cx: 8, cy: 8, r: 3.2 }),
+        }),
+        iconButton({
+          title: t('fetchAll'),
+          busy: syncBusy === 'fetchAll',
+          disabled: isRepo === false || syncBusy !== '',
+          onClick: () => doSync('fetchAll'),
+          path: 'M8 2v7M5 6.5l3 3 3-3M3 13h10',
+        }),
+        iconButton({
+          title: t('pull'),
+          busy: syncBusy === 'pull',
+          disabled: isRepo === false || syncBusy !== '',
+          onClick: () => doSync('pull'),
+          path: 'M8 2v9M4.5 7.5l3.5 3.5 3.5-3.5',
+        }),
+        iconButton({
+          title: summary !== null && summary.upstream === null ? t('publish') : t('push'),
+          busy: syncBusy === 'push',
+          disabled: isRepo === false || syncBusy !== '',
+          onClick: () => doSync('push'),
+          path: 'M8 13V4M4.5 7.5L8 4l3.5 3.5',
+        }),
+        iconButton({
+          title: t('refresh'),
           onClick: () => { void refreshAll() },
-          title: 'refresh',
-        }, '⟳'))
+          path: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.5V6h-3.5',
+        }),
+        iconButton({
+          title: t('moreActions'),
+          onClick: () => setMoreOpen(true),
+          path: 'M3.5 8h.01M8 8h.01M12.5 8h.01',
+          dot: true,
+        }))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
       const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
@@ -1481,12 +1751,54 @@ window.__ModuleLoader__.load({
           onClose: () => setMenu(null),
           onCheckout: onCheckout,
           onBranch: onBranch,
+        }),
+        moreOpen === false ? null : E('div', {
+          className: 'gw-scrim',
+          style: { background: 'transparent' },
+          onMouseDown: (event) => { if (event.target === event.currentTarget) setMoreOpen(false) },
+        },
+          E('div', {
+            className: 'gw-menu',
+            style: { position: 'absolute', right: '12px', bottom: '12px' },
+          },
+            E('div', {
+              className: 'gw-menu-item',
+              onClick: () => { setMoreOpen(false); setRemoteOpen(true) },
+            }, t('remotes')),
+            E('div', { className: 'gw-menu-sep' }),
+            E('div', { className: 'gw-menu-item' }, t('openInTerminal')))),
+        remoteOpen === false ? null : E(RemoteDialog, {
+          t: t,
+          list: remoteList,
+          onClose: () => setRemoteOpen(false),
+          onSave: onRemoteSave,
+          onRemove: onRemoteRemove,
         }))
     }
 
     /* ------------------------------------------------------------------ */
     /* registration                                                        */
     /* ------------------------------------------------------------------ */
+
+    /** 图头那一排小图标按钮：统一 22px 热区、14px 图形，忙时换成省略号。 */
+    function iconButton(props) {
+      const children = props.busy === true
+        ? E('span', { style: { fontSize: '11px' } }, '···')
+        : E('svg', {
+            width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
+            stroke: 'currentColor',
+            strokeWidth: props.dot === true ? 2 : 1.4,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          },
+            E('path', { d: props.path }),
+            props.extra === undefined ? null : props.extra)
+      return E('button', {
+        className: 'gw-icon' + (props.active === true ? ' gw-icon-on' : ''),
+        title: props.title,
+        disabled: props.disabled === true,
+        onClick: props.onClick,
+      }, children)
+    }
 
     function TabIcon(props) {
       const size = typeof props.size === 'number' ? props.size : 16
