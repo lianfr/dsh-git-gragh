@@ -85,8 +85,6 @@ window.__ModuleLoader__.load({
 .gw-row-sel { background:var(--dsw-alias-interactive-bg-active); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
 .gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px; }
-.gw-row-hash { color:var(--dsw-alias-label-tertiary); font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:10.5px; flex:none; }
 
 .gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
@@ -560,8 +558,8 @@ window.__ModuleLoader__.load({
       },
         refs.map((ref, index) => E(RefBadge, { key: 'r' + String(index), item: ref })),
         E('span', { className: 'gw-row-subject' }, entry.subject),
-        E('span', { className: 'gw-row-meta' }, entry.author + ' · ' + relativeTime(entry.time, t)),
-        E('span', { className: 'gw-row-hash' }, entry.short))
+        E('span', { className: 'gw-row-meta' },
+          entry.author + ' · ' + relativeTime(entry.time, t) + ' · ' + entry.short))
     }
 
     function DiffPane(props) {
