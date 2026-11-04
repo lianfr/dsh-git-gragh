@@ -1333,6 +1333,9 @@ window.__ModuleLoader__.load({
           title: 'refresh',
         }, '⟳'))
 
+      // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
+      const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
+
       const body = diffView !== null
         ? E(DiffPane, {
             t: t,
@@ -1387,7 +1390,9 @@ window.__ModuleLoader__.load({
                       })
                     }),
                     rowEntries.map((entry, index) => {
-                      const hollow = entry.uncommitted === true || (headHash !== null && entry.hash === headHash)
+                      // 只有一个空心圆：有未提交行时空心归它，否则归当前 HEAD。
+                      const hollow = entry.uncommitted === true
+                        || (hasUncommitted === false && headHash !== null && entry.hash === headHash)
                       return E('circle', {
                         key: 'c' + String(index),
                         cx: layout.rowLane[index] * LANE_W + 12,
