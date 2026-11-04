@@ -112,11 +112,15 @@ window.__ModuleLoader__.load({
 .gw-ref-stash .gw-ref-flag { background:transparent;
   border:1px solid color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
-  font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary); }
+  font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary);
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* 悬停时平滑滑到结尾停住，两端做羽化；文字没溢出时位移为 0，什么都不会发生。 */
+.gw-ref:hover .gw-ref-label {
+  mask-image:linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent); }
 .gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
-  animation:gw-ref-marquee 4s ease-in-out infinite alternate; }
-@keyframes gw-ref-marquee {
+  animation:gw-ref-slide 1.4s ease-in-out .15s forwards; }
+@keyframes gw-ref-slide {
   from { transform:translateX(0); }
   to { transform:translateX(min(0px, calc(-100% + 120px))); }
 }
