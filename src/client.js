@@ -108,8 +108,8 @@ window.__ModuleLoader__.load({
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 1.5%, var(--dsw-alias-bg-layer-1));
   border-bottom:1px solid var(--dsw-alias-border-l2);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
-.gw-drawer-divider { position:absolute; top:0; bottom:0; width:0;
-  border-left:1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+.gw-drawer-divider { position:absolute; top:8px; bottom:8px; width:0;
+  border-left:1px solid var(--dsw-alias-border-l1);
   pointer-events:none; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
 .gw-detail-msg { white-space:pre-wrap; font-size:12px; margin:0 0 8px; color:var(--dsw-alias-label-primary); }
