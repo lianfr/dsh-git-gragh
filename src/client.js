@@ -393,7 +393,6 @@ window.__ModuleLoader__.load({
       const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
 
       const laneLast = []
-      const laneShift = []
       const laneOfRow = new Array(entries.length).fill(-1)
 
       const fillRows = (chainIndex) => {
@@ -406,7 +405,7 @@ window.__ModuleLoader__.load({
       const takeLane = (chainIndex) => {
         const chain = chains[chainIndex]
         if (chainIndex === trunkChain) {
-          if (laneLast.length === 0) { laneLast.push(chain.last); laneShift.push(0) }
+          if (laneLast.length === 0) laneLast.push(chain.last)
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
           chain.color = 0
@@ -425,16 +424,14 @@ window.__ModuleLoader__.load({
         for (let j = start; j < laneLast.length; j++) {
           if (chain.first > laneLast[j]) {
             chain.lane = j
-            chain.color = j + laneShift[j]
+            chain.color = j
             laneLast[j] = chain.last
-            laneShift[j] += 1
             fillRows(chainIndex)
             return
           }
         }
-        while (laneLast.length < start) { laneLast.push(-1); laneShift.push(0) }
+        while (laneLast.length < start) laneLast.push(-1)
         laneLast.push(chain.last)
-        laneShift.push(0)
         chain.lane = laneLast.length - 1
         chain.color = chain.lane
         fillRows(chainIndex)
