@@ -407,6 +407,16 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // 取色：同一条列上每复用一次就往后顺延一格，且不能和它的父链撞色——
+      // 分叉出来的两条分支颜色必须不同，这是肉眼分辨走向的前提。
+      const pickColor = (lane, fatherColor) => {
+        while (laneUses.length <= lane) laneUses.push(0)
+        let color = lane + laneUses[lane]
+        if (color === fatherColor) color += 1
+        laneUses[lane] = color - lane + 1
+        return color
+      }
+
       const takeLane = (chainIndex) => {
         const chain = chains[chainIndex]
         if (chainIndex === trunkChain) {
@@ -414,7 +424,7 @@ window.__ModuleLoader__.load({
           laneLast[0] = Math.max(laneLast[0], chain.last)
           chain.lane = 0
           chain.color = 0
-          laneUses[0] += 1
+          laneUses[0] = 1
           fillRows(chainIndex)
           return
         }
@@ -425,14 +435,14 @@ window.__ModuleLoader__.load({
         const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
         const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
         const fatherLane = fatherChain >= 0 && fatherChain !== chainIndex ? laneOfRow[fatherRow] : -1
+        const fatherColor = fatherChain >= 0 && fatherChain !== chainIndex ? chains[fatherChain].color : -1
         const start = Math.max(1, fatherLane + 1)
 
         for (let j = start; j < laneLast.length; j++) {
           if (chain.first > laneLast[j]) {
             chain.lane = j
-            chain.color = j + laneUses[j]
+            chain.color = pickColor(j, fatherColor)
             laneLast[j] = chain.last
-            laneUses[j] += 1
             fillRows(chainIndex)
             return
           }
@@ -441,8 +451,7 @@ window.__ModuleLoader__.load({
         laneLast.push(chain.last)
         laneUses.push(0)
         chain.lane = laneLast.length - 1
-        chain.color = chain.lane + laneUses[chain.lane]
-        laneUses[chain.lane] += 1
+        chain.color = pickColor(chain.lane, fatherColor)
         fillRows(chainIndex)
       }
 
