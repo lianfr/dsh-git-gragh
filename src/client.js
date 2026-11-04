@@ -97,7 +97,7 @@ window.__ModuleLoader__.load({
 .gw-ref-remote { background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 22%, transparent);
   color:var(--dsw-alias-label-secondary); }
 
-.gw-drawer { position:absolute; left:0; right:0; background:var(--dsw-alias-bg-layer-1);
+.gw-drawer { position:absolute; right:0; background:var(--dsw-alias-bg-layer-1);
   border-top:1px solid var(--dsw-alias-border-l2); border-bottom:1px solid var(--dsw-alias-border-l2);
   display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
 .gw-drawer-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 12px; }
@@ -591,7 +591,7 @@ window.__ModuleLoader__.load({
       const detail = props.detail
       return E('div', {
         className: 'gw-drawer',
-        style: { top: props.top + 'px', height: props.height + 'px' },
+        style: { top: props.top + 'px', height: props.height + 'px', left: props.left + 'px' },
         onClick: (event) => event.stopPropagation(),
       },
         E('div', { className: 'gw-drawer-scroll' },
@@ -1079,6 +1079,7 @@ window.__ModuleLoader__.load({
                         t: t,
                         detail: detail,
                         top: drawerTop,
+                        left: laneWidth,
                         height: DRAWER_H,
                         onOpenFile: openCommitDiff,
                       })))
