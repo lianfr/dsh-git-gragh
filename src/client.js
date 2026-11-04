@@ -344,7 +344,9 @@ window.__ModuleLoader__.load({
     }
 
     function computeLayout(entries) {
-      if (entries.length === 0) return { rowLane: [], laneCount: 1, edges: [], rowOfHash: new Map() }
+      if (entries.length === 0) {
+        return { rowLane: [], rowColor: [], laneCount: 1, edges: [], rowOfHash: new Map() }
+      }
 
       const rowOfHash = new Map()
       for (let i = 0; i < entries.length; i++) rowOfHash.set(entries[i].hash, i)
@@ -352,77 +354,82 @@ window.__ModuleLoader__.load({
       let trunkTip = findTrunkTip(entries)
       if (trunkTip === null) trunkTip = entries[0].hash
 
-      const TRUNK = -1
-      const trunkSet = new Set()
-      let cursor = trunkTip
-      let guard = 0
-      while (cursor !== null && cursor !== undefined && rowOfHash.has(cursor) && guard <= entries.length) {
-        trunkSet.add(cursor)
-        const idx = rowOfHash.get(cursor)
-        const parents = Array.isArray(entries[idx].parents) ? entries[idx].parents : []
-        cursor = parents.length > 0 ? parents[0] : null
-        guard += 1
-      }
-
-      // lanes[j] 是第 j 列正在等待的提交，null 表示这一列空着。
-      // 一列上的活干完就还给别人用，所以一条泳道会先后容纳多条分支。
-      const lanes = []
-      const rowLane = new Array(entries.length)
-
-      const findLane = (hash) => {
-        for (let j = 0; j < lanes.length; j++) if (lanes[j] === hash) return j
-        return -1
-      }
-      const freeLane = (from) => {
-        for (let j = from; j < lanes.length; j++) if (lanes[j] === null) return j
-        while (lanes.length < from) lanes.push(null)
-        lanes.push(null)
-        return lanes.length - 1
-      }
-
+      // 一、切链：每行沿第一父往下走，撞到已经有主的提交就停。
+      // 一条链就是图上一段连续画下来的线，链内不会断开。
+      const chainOf = new Array(entries.length).fill(-1)
+      const chains = []
       for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]
-        let myLane = findLane(entry.hash)
-        if (trunkSet.has(entry.hash)) {
-          // 主分支永远占第 0 列，原先占着的人让到别的空位去
-          if (myLane > 0) lanes[myLane] = null
-          if (lanes[0] !== undefined && lanes[0] !== null && lanes[0] !== entry.hash) {
-            lanes[freeLane(1)] = lanes[0]
-          }
-          lanes[0] = entry.hash
-          myLane = 0
-        } else if (myLane < 0) {
-          // 第 0 列留给主分支，其余提交从第 1 列起找位置，
-          // 这样从主分支新开出来的分支一定在侧面，不会看着像主线的延伸
-          myLane = freeLane(1)
-          lanes[myLane] = entry.hash
+        if (chainOf[i] >= 0) continue
+        const chain = { first: i, last: i, lane: 0, color: 0 }
+        let row = i
+        while (row >= 0 && chainOf[row] < 0) {
+          chainOf[row] = chains.length
+          chain.last = row
+          const parents = Array.isArray(entries[row].parents) ? entries[row].parents : []
+          if (parents.length === 0) break
+          const next = rowOfHash.get(parents[0])
+          if (next === undefined || next <= row) break
+          row = next
         }
-        rowLane[i] = myLane
-        lanes[myLane] = null
-
-        const parents = Array.isArray(entry.parents) ? entry.parents : []
-        for (let p = 0; p < parents.length; p++) {
-          const hash = parents[p]
-          if (!rowOfHash.has(hash)) continue
-          if (p === 0) {
-            lanes[myLane] = hash
-            continue
-          }
-          if (findLane(hash) >= 0) continue
-          // 合并回来的那一支优先落到左侧空位，表现出来就是往左变道
-          let slot = -1
-          for (let j = 0; j < myLane; j++) if (lanes[j] === null) { slot = j; break }
-          if (slot < 0) slot = freeLane(myLane + 1)
-          lanes[slot] = hash
-        }
+        chains.push(chain)
       }
 
-      // 未提交的改动跟它所属的分支同列，不单独占一条泳道
+      // 二、分列：主分支锁第 0 列；其余的从左往右找第一条满足
+      // 「自己这条链的起点，落在该列上一段的结束行之下至少再隔一行」的道。
+      // 差那一行就是为了不让两段首尾相接、连成一根直线。
+      const trunkRow = rowOfHash.get(trunkTip)
+      const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
+
+      const laneLast = []
+      const laneShift = []
+
+      const takeLane = (chainIndex) => {
+        const chain = chains[chainIndex]
+        if (chainIndex === trunkChain) {
+          if (laneLast.length === 0) { laneLast.push(chain.last); laneShift.push(0) }
+          laneLast[0] = Math.max(laneLast[0], chain.last)
+          chain.lane = 0
+          chain.color = 0
+          return
+        }
+        for (let j = 1; j < laneLast.length; j++) {
+          if (chain.first > laneLast[j] + 1) {
+            chain.lane = j
+            chain.color = j + laneShift[j]
+            laneLast[j] = chain.last
+            laneShift[j] += 1
+            return
+          }
+        }
+        laneLast.push(chain.last)
+        laneShift.push(0)
+        chain.lane = laneLast.length - 1
+        chain.color = chain.lane
+      }
+
+      const rest = []
+      for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
+      rest.sort((a, b) => chains[a].first - chains[b].first)
+      const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
+      for (const index of order) takeLane(index)
+
+      const rowLane = new Array(entries.length).fill(0)
+      const rowColor = new Array(entries.length).fill(0)
+      for (let i = 0; i < entries.length; i++) {
+        const chain = chains[chainOf[i]]
+        rowLane[i] = chain.lane
+        rowColor[i] = chain.color
+      }
+
+      // 未提交的改动跟它所属的分支同列同色，不单独占道
       for (let i = 0; i < entries.length; i++) {
         if (entries[i].uncommitted !== true) continue
         const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
         const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
-        if (row !== undefined) rowLane[i] = rowLane[row]
+        if (row !== undefined) {
+          rowLane[i] = rowLane[row]
+          rowColor[i] = rowColor[row]
+        }
       }
 
       let laneCount = 1
@@ -434,11 +441,19 @@ window.__ModuleLoader__.load({
         for (let p = 0; p < parents.length; p++) {
           const row = rowOfHash.get(parents[p])
           if (row === undefined) continue
-          edges.push({ from: i, to: row, fromLane: rowLane[i], toLane: rowLane[row], primary: p === 0 })
+          edges.push({
+            from: i,
+            to: row,
+            fromLane: rowLane[i],
+            toLane: rowLane[row],
+            fromColor: rowColor[i],
+            toColor: rowColor[row],
+            primary: p === 0,
+          })
         }
       }
 
-      return { rowLane, laneCount, edges, rowOfHash }
+      return { rowLane, rowColor, laneCount, edges, rowOfHash }
     }
 
     /* ------------------------------------------------------------------ */
@@ -1221,7 +1236,7 @@ window.__ModuleLoader__.load({
                         key: 'e' + String(index),
                         d: d,
                         fill: 'none',
-                        stroke: ghost ? 'var(--dsw-alias-label-tertiary)' : laneColor(edge.primary ? edge.fromLane : edge.toLane),
+                        stroke: ghost ? 'var(--dsw-alias-label-tertiary)' : laneColor(edge.primary ? edge.fromColor : edge.toColor),
                         strokeWidth: edge.primary ? 1.6 : 1.2,
                         strokeOpacity: edge.to === edge.from + 1 ? 1 : 0.85,
                       })
@@ -1233,10 +1248,10 @@ window.__ModuleLoader__.load({
                         cx: layout.rowLane[index] * LANE_W + 12,
                         cy: offsets.list[index] + ROW_H / 2,
                         r: hollow ? 3.6 : 3.4,
-                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowLane[index]),
+                        fill: hollow ? 'var(--dsw-alias-bg-layer-1)' : laneColor(layout.rowColor[index]),
                         stroke: hollow === false
                           ? 'var(--dsw-alias-bg-layer-1)'
-                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowLane[index])),
+                          : (entry.uncommitted === true ? 'var(--dsw-alias-label-tertiary)' : laneColor(layout.rowColor[index])),
                         strokeWidth: hollow ? 1.6 : 1.2,
                       })
                     })),
