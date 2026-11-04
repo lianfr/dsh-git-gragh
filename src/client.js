@@ -440,40 +440,30 @@ window.__ModuleLoader__.load({
         fillRows(chainIndex)
       }
 
+      // 链的层级：主干为 0，直接从主干分出来的为 1，再往下递增。
+      // 按层级从浅到深分配，子链落位时父链的列已经定好，
+      // 所以「分出来的链必须在父的右边」是算出来的，不是事后挪出来的。
+      const depth = new Array(chains.length).fill(0)
+      for (let round = 0; round < chains.length; round++) {
+        let changed = false
+        for (let i = 0; i < chains.length; i++) {
+          const tailParents = Array.isArray(entries[chains[i].last].parents) ? entries[chains[i].last].parents : []
+          const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
+          const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
+          if (fatherChain < 0 || fatherChain === i) continue
+          if (depth[i] < depth[fatherChain] + 1) {
+            depth[i] = depth[fatherChain] + 1
+            changed = true
+          }
+        }
+        if (!changed) break
+      }
+
       const rest = []
       for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
-      // stash 自己占一条道，不能被并进它所属的分支里看着像分支的一部分。
-      rest.sort((a, b) => chains[a].first - chains[b].first)
+      rest.sort((a, b) => (depth[a] - depth[b]) || (chains[a].first - chains[b].first))
       const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
       for (const index of order) takeLane(index)
-
-      // stash 是挂在某条分支上的快照，不算分支本身：它单独占一列，
-      // 插在它父提交所在列的紧右边，其余列整体右移让位，
-      // 这样既不会被并进分支，也不至于孤零零甩到最右边。
-      for (let index = 0; index < chains.length; index++) {
-        const headRefs = Array.isArray(entries[chains[index].first].refs) ? entries[chains[index].first].refs : []
-        let stashed = false
-        for (let r = 0; r < headRefs.length; r++) if (headRefs[r] && headRefs[r].type === 'stash') { stashed = true; break }
-        if (!stashed) continue
-        const stashParents = Array.isArray(entries[chains[index].first].parents) ? entries[chains[index].first].parents : []
-        const baseRow = stashParents.length > 0 ? rowOfHash.get(stashParents[0]) : undefined
-        const baseChain = baseRow === undefined ? -1 : chainOf[baseRow]
-        if (baseChain < 0 || baseChain === index) continue
-        const at = chains[baseChain].lane + 1
-        if (chains[index].lane === at) continue
-        // 只让真正与 stash 所在行冲突的链让位，
-        // 行区间不重叠的照旧共用一列，别平白多出一条空道。
-        const stashFirst = chains[index].first
-        const stashLast = chains[index].last
-        for (let other = 0; other < chains.length; other++) {
-          if (other === index) continue
-          if (chains[other].lane < at) continue
-          if (chains[other].last < stashFirst || chains[other].first > stashLast) continue
-          chains[other].lane += 1
-        }
-        chains[index].lane = at
-      }
-      for (let i = 0; i < chains.length; i++) chains[i].color = chains[i].lane
 
       const rowLane = new Array(entries.length).fill(0)
       const rowColor = new Array(entries.length).fill(0)
