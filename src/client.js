@@ -110,7 +110,7 @@ window.__ModuleLoader__.load({
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 /* 只有标签与 stash 改成空心：只描边不填色，其余类型仍是实心块。 */
 .gw-ref-tag .gw-ref-flag { background:transparent;
-  border-color:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+  border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-stash .gw-ref-flag { background:transparent;
   border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0; overflow:hidden;
@@ -132,6 +132,9 @@ window.__ModuleLoader__.load({
   to { transform:translateX(var(--gw-ref-shift, 0px)); }
 }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
+.gw-ref-kind { display:flex; align-items:center; flex:none; padding:0 4px; box-sizing:border-box;
+  border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  font-size:9px; line-height:13px; color:var(--dsw-alias-label-tertiary); }
 .gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
   border:1px solid var(--dsw-alias-border-l2); border-left:none;
   border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
@@ -694,7 +697,7 @@ window.__ModuleLoader__.load({
       let cls = 'gw-ref'
       let label = ref.name === undefined || ref.name === null ? '' : String(ref.name)
       if (ref.type === 'head') { cls += ' gw-ref-head'; if (label === '') label = 'HEAD' }
-      else if (ref.type === 'tag') { cls += ' gw-ref-tag'; label = 'tag ' + label }
+      else if (ref.type === 'tag') { cls += ' gw-ref-tag' }
       else if (ref.type === 'remote') { cls += ' gw-ref-remote' }
       else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
       else { cls += ' gw-ref-branch' }
@@ -707,6 +710,7 @@ window.__ModuleLoader__.load({
       if (hasRemotes) cls += ' gw-ref-linked'
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
+        ref.type === 'tag' ? E('span', { className: 'gw-ref-kind' }, '⚑') : null,
         E('span', { className: 'gw-ref-label' },
           E('span', { className: 'gw-ref-view' },
             E('span', {
