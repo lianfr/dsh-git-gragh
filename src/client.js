@@ -1050,11 +1050,12 @@ window.__ModuleLoader__.load({
                       if (Math.abs(x1 - x2) < 0.5) {
                         d = 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2
                       } else if (selectedIndex >= 0 && edge.from <= selectedIndex && edge.to > selectedIndex) {
-                        // 跨抽屉的边：换道收在抽屉上沿之前完成，抽屉区间内保持竖直，
+                        // 跨抽屉的边：抽屉区间内保持竖直，换道收在抽屉下沿之后完成，
                         // 避免长距离缓坡斜穿整个详情块
-                        const mid = (y1 + drawerTop) / 2
-                        d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + drawerTop
-                          + ' L' + x2 + ',' + y2
+                        const bottom = drawerTop + DRAWER_H
+                        const mid = (bottom + y2) / 2
+                        d = 'M' + x1 + ',' + y1 + ' L' + x1 + ',' + bottom
+                          + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
                       } else {
                         const mid = (y1 + y2) / 2
                         d = 'M' + x1 + ',' + y1 + ' C' + x1 + ',' + mid + ' ' + x2 + ',' + mid + ' ' + x2 + ',' + y2
