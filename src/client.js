@@ -1599,45 +1599,59 @@ window.__ModuleLoader__.load({
           title: focus === true ? t('viewAll') : t('viewFocus'),
           active: focus === true,
           onClick: () => setFocus(focus === false),
-          path: focus === true ? 'M8 2v12M8 7h4' : 'M4 2v12M8 2v12M12 2v12',
+          path: focus === true ? 'M8 3v10' : 'M4.5 3v10M8 3v10M11.5 3v10',
         }),
         iconButton({
           title: t('locate'),
           onClick: locateHead,
-          path: 'M8 3v10M3 8h10',
-          extra: E('circle', { cx: 8, cy: 8, r: 3.2 }),
+          path: '',
+          extra: [
+            E('circle', { key: 'o', cx: 8, cy: 8, r: 5.2 }),
+            E('circle', { key: 'i', cx: 8, cy: 8, r: 1.6 }),
+          ],
         }),
         iconButton({
           title: t('fetchAll'),
           busy: syncBusy === 'fetchAll',
           disabled: isRepo === false || syncBusy !== '',
           onClick: () => doSync('fetchAll'),
-          path: 'M8 2v7M5 6.5l3 3 3-3M3 13h10',
+          path: 'M8 2.5v4',
+          dash: '2 1.8',
+          extra: [
+            E('path', { key: 'a', d: 'M8 6.6v3.6M5.2 7.4L8 10.2l2.8-2.8' }),
+            E('path', { key: 'b', d: 'M3.2 13.4h9.6' }),
+          ],
         }),
         iconButton({
           title: t('pull'),
           busy: syncBusy === 'pull',
           disabled: isRepo === false || syncBusy !== '',
           onClick: () => doSync('pull'),
-          path: 'M8 2v9M4.5 7.5l3.5 3.5 3.5-3.5',
+          path: 'M8 2.2v7.8M5.2 7.2L8 10l2.8-2.8',
+          extra: E('path', { d: 'M3.2 13.4h9.6' }),
         }),
         iconButton({
           title: summary !== null && summary.upstream === null ? t('publish') : t('push'),
           busy: syncBusy === 'push',
           disabled: isRepo === false || syncBusy !== '',
           onClick: () => doSync('push'),
-          path: 'M8 13V4M4.5 7.5L8 4l3.5 3.5',
+          path: 'M8 13.4V5.6M5.2 8.4L8 5.6l2.8 2.8',
+          extra: E('path', { d: 'M3.2 2.6h9.6' }),
         }),
         iconButton({
           title: t('refresh'),
           onClick: () => { void refreshAll() },
-          path: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.5V6h-3.5',
+          path: 'M13 8a5 5 0 1 1-1.5-3.6M13.2 2.6v3.2h-3.2',
         }),
         iconButton({
           title: t('moreActions'),
           onClick: () => setMoreOpen(true),
-          path: 'M3.5 8h.01M8 8h.01M12.5 8h.01',
-          dot: true,
+          path: '',
+          extra: [
+            E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '3', cx: 12.6, cy: 8, r: 1.1, fill: 'currentColor' }),
+          ],
         }))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
@@ -1782,16 +1796,18 @@ window.__ModuleLoader__.load({
 
     /** 图头那一排小图标按钮：统一 22px 热区、14px 图形，忙时换成省略号。 */
     function iconButton(props) {
+      const extras = props.extra === undefined
+        ? []
+        : (Array.isArray(props.extra) ? props.extra : [props.extra])
       const children = props.busy === true
         ? E('span', { style: { fontSize: '11px' } }, '···')
         : E('svg', {
-            width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: props.dot === true ? 2 : 1.4,
+            width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none',
+            stroke: 'currentColor', strokeWidth: 1.2,
             strokeLinecap: 'round', strokeLinejoin: 'round',
           },
-            E('path', { d: props.path }),
-            props.extra === undefined ? null : props.extra)
+            props.path === '' ? null : E('path', { d: props.path, strokeDasharray: props.dash }),
+            extras)
       return E('button', {
         className: 'gw-icon' + (props.active === true ? ' gw-icon-on' : ''),
         title: props.title,
