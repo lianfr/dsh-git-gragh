@@ -343,6 +343,17 @@ window.__ModuleLoader__.load({
       ].join('\u0000')
     }
 
+    // 带分支、标签或 stash 的提交自成一链，跟 Git Graph 一样各占一条泳道，
+    // 不跟上游挤在同一列里。
+    function hasNamedRef(entry) {
+      if (!Array.isArray(entry.refs)) return false
+      for (const ref of entry.refs) {
+        if (ref.type === 'head' || ref.type === 'branch') return true
+        if (ref.type === 'remote' || ref.type === 'tag' || ref.type === 'stash') return true
+      }
+      return false
+    }
+
     function computeLayout(entries) {
       if (entries.length === 0) return { rowLane: [], laneCount: 1, edges: [], rowOfHash: new Map() }
 
@@ -373,6 +384,9 @@ window.__ModuleLoader__.load({
         let chain
         if (trunkSet.has(entry.hash)) {
           chain = TRUNK
+          active.delete(entry.hash)
+        } else if (hasNamedRef(entry)) {
+          chain = nextChain++
           active.delete(entry.hash)
         } else {
           chain = active.get(entry.hash)
