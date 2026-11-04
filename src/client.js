@@ -2150,8 +2150,11 @@ window.__ModuleLoader__.load({
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
+                      /* 父提交还没加载出来：线一路走到最后一行就停，不额外做标记。
+                       * 这是 Git Graph 的做法——它把找不到的父接到一个空顶点上，
+                       * 线自然延伸到图末尾，读者看不出「断」。 */
                       const y2 = edge.dangling === true
-                        ? offsets.total
+                        ? offsets.list[rowEntries.length - 1] + ROW_H
                         : offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
