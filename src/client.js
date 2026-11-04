@@ -84,9 +84,10 @@ window.__ModuleLoader__.load({
 .gw-canvas { position:relative; }
 .gw-row { position:absolute; left:0; right:0; display:flex; align-items:center; gap:6px;
   padding-right:8px; cursor:pointer; user-select:none; }
-.gw-row:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-row-sel { background:var(--dsw-alias-interactive-bg-active);
+.gw-row:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
+.gw-row-sel, .gw-row-sel:hover { background:var(--dsw-alias-interactive-bg-active);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
 .gw-row-meta { display:flex; align-items:center; gap:4px; flex:none; font-size:11px; padding:0 4px;
   color:var(--dsw-alias-label-tertiary);
