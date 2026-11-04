@@ -699,11 +699,11 @@ window.__ModuleLoader__.load({
       else if (ref.type === 'stash') { cls += ' gw-ref-stash' }
       else { cls += ' gw-ref-branch' }
       const hasRemotes = Array.isArray(props.remotes) && props.remotes.length > 0
-      // 等宽字体十号字，一个字符约六像素；按可见宽度算出要滑多远、滑多久（每秒六字符）。
+      // 等宽字体十号字，一个字符约六像素；按可见宽度算出要滑多远、滑多久（每秒四字符）。
       const textWidth = label.length * 6
       const visible = hasRemotes ? 96 : 130
       const shift = Math.max(0, textWidth - visible)
-      const seconds = shift === 0 ? 0 : Math.max(0.6, shift / 36)
+      const seconds = shift === 0 ? 0 : Math.max(0.8, shift / 24)
       if (hasRemotes) cls += ' gw-ref-linked'
       return E('span', { className: cls, style: { '--gw-ref-fill': chain }, title: label },
         E('span', { className: 'gw-ref-flag' }),
