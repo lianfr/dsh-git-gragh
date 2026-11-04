@@ -210,24 +210,26 @@ window.__ModuleLoader__.load({
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
 /* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
 .gw-err { position:absolute; top:6px; left:10px; right:10px; z-index:60; padding:8px 12px;
-  border-radius:20px; border-radius:var(--dsw-radius-xl, 20px); font-size:11.5px;
+  border-radius:12px; border-radius:var(--dsw-radius-md, 12px); font-size:11.5px;
   background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, var(--dsw-alias-bg-layer-2));
   color:var(--dsw-alias-state-error-primary);
   border:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent);
   box-shadow:0 6px 18px rgba(0,0,0,.16); pointer-events:auto;
   display:flex; align-items:center; gap:8px;
-  animation:gw-err-life 4s ease forwards; }
+  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 3.6s forwards; }
 .gw-err-text { flex:1 1 auto; min-width:0; }
 .gw-err-close { flex:none; display:flex; align-items:center; justify-content:center;
   width:16px; height:16px; padding:0; border:none; border-radius:50%; background:transparent;
   color:inherit; cursor:pointer; font-size:13px; line-height:1; opacity:.65; }
 .gw-err-close:hover { opacity:1;
   background:color-mix(in srgb, currentColor 16%, transparent); }
-@keyframes gw-err-life {
-  0% { opacity:0; transform:translateY(-5px); }
-  7% { opacity:1; transform:none; }
-  86% { opacity:1; transform:none; }
-  100% { opacity:0; transform:translateY(-3px); }
+@keyframes gw-err-in {
+  from { opacity:0; transform:translateY(-6px) scale(.985); }
+  to { opacity:1; transform:none; }
+}
+@keyframes gw-err-out {
+  from { opacity:1; transform:none; }
+  to { opacity:0; transform:translateY(-4px) scale(.99); }
 }
 .gw-menu { position:fixed; z-index:9999; min-width:190px; padding:4px; border-radius:8px;
   background:var(--dsw-alias-bg-layer-3); border:1px solid var(--dsw-alias-border-l2);
@@ -1345,7 +1347,7 @@ window.__ModuleLoader__.load({
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
         if (error === null) return undefined
-        const timer = setTimeout(() => { if (aliveRef.current) setError(null) }, 4000)
+        const timer = setTimeout(() => { if (aliveRef.current) setError(null) }, 4100)
         return () => clearTimeout(timer)
       }, [error])
 
