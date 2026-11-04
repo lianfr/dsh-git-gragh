@@ -99,35 +99,39 @@ window.__ModuleLoader__.load({
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-row-sep { opacity:.5; }
 
+/* 拼接式：左格自带一圈链色边，右格自带一圈中性边，两格共一条分界线。 */
 .gw-ref { display:inline-flex; align-items:stretch; height:15px; flex:none; max-width:150px;
-  overflow:hidden; box-sizing:border-box;
-  border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
-  border:1px solid var(--dsw-alias-border-l2);
-  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent); }
-.gw-ref-flag { width:5px; flex:none; box-sizing:border-box;
-  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
-.gw-ref-remote .gw-ref-flag { opacity:.4; }
-.gw-ref-tag .gw-ref-flag { background:transparent;
-  border:1px solid var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
-.gw-ref-stash .gw-ref-flag { background:transparent;
-  border:1px solid color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+  overflow:hidden; box-sizing:border-box; }
+.gw-ref-flag { width:7px; flex:none; box-sizing:border-box;
+  border-radius:4px 0 0 4px; border-radius:var(--dsw-radius-xs, 4px) 0 0 var(--dsw-radius-xs, 4px);
+  border:1px solid var(--gw-ref-fill, var(--dsw-alias-brand-primary));
+  background:transparent; }
+.gw-ref-remote .gw-ref-flag {
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+.gw-ref-stash .gw-ref-flag { border-color:color-mix(in srgb,
+  var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
+  box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:10px; line-height:13px; font-weight:500; color:var(--dsw-alias-label-secondary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-ref-text { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* 悬停时平滑滑到结尾停住，两端做羽化；文字没溢出时位移为 0，什么都不会发生。 */
 .gw-ref:hover .gw-ref-label {
-  mask-image:linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent); }
+  mask-image:linear-gradient(to right, transparent, black 18px, black calc(100% - 18px), transparent); }
 .gw-ref:hover .gw-ref-text { width:max-content; text-overflow:clip;
-  animation:gw-ref-slide 1.4s ease-in-out .15s forwards; }
+  animation:gw-ref-slide 2.8s cubic-bezier(.4, 0, .2, 1) .2s forwards; }
 @keyframes gw-ref-slide {
   from { transform:translateX(0); }
   to { transform:translateX(min(0px, calc(-100% + 120px))); }
 }
-.gw-ref-head { border-color:var(--gw-ref-fill); }
+.gw-ref-head .gw-ref-flag { border-width:1.5px; }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
-.gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px;
-  border-left:1px solid var(--dsw-alias-border-l2);
+.gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
+  border:1px solid var(--dsw-alias-border-l2); border-left:none;
+  border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
+  background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 10%, transparent);
   font-size:9px; color:var(--dsw-alias-label-tertiary); white-space:nowrap; }
 .gw-ref-remote .gw-ref-label { font-style:italic; }
 
