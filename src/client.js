@@ -104,12 +104,15 @@ window.__ModuleLoader__.load({
   overflow:hidden; box-sizing:border-box; }
 .gw-ref-flag { width:7px; flex:none; box-sizing:border-box;
   border-radius:4px 0 0 4px; border-radius:var(--dsw-radius-xs, 4px) 0 0 var(--dsw-radius-xs, 4px);
-  border:1px solid var(--gw-ref-fill, var(--dsw-alias-brand-primary));
-  background:transparent; }
+  border:1px solid transparent;
+  background:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
 .gw-ref-remote .gw-ref-flag {
   background:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
-.gw-ref-stash .gw-ref-flag { border-color:color-mix(in srgb,
-  var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
+/* 只有标签与 stash 改成空心：只描边不填色，其余类型仍是实心块。 */
+.gw-ref-tag .gw-ref-flag { background:transparent;
+  border-color:var(--gw-ref-fill, var(--dsw-alias-brand-primary)); }
+.gw-ref-stash .gw-ref-flag { background:transparent;
+  border-color:color-mix(in srgb, var(--gw-ref-fill, var(--dsw-alias-brand-primary)) 40%, transparent); }
 .gw-ref-label { display:block; flex:1 1 auto; min-width:0; padding:0 5px 0 5px; overflow:hidden;
   box-sizing:border-box; border:1px solid var(--dsw-alias-border-l2); border-left:none;
   border-radius:0 4px 4px 0; border-radius:0 var(--dsw-radius-xs, 4px) var(--dsw-radius-xs, 4px) 0;
@@ -126,7 +129,6 @@ window.__ModuleLoader__.load({
   from { transform:translateX(0); }
   to { transform:translateX(min(0px, calc(-100% + 120px))); }
 }
-.gw-ref-head .gw-ref-flag { border-width:1.5px; }
 .gw-ref-head .gw-ref-label { font-weight:600; color:var(--dsw-alias-label-primary); }
 .gw-ref-remotes { display:flex; align-items:center; flex:none; padding:0 5px; box-sizing:border-box;
   border:1px solid var(--dsw-alias-border-l2); border-left:none;
