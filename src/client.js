@@ -3,7 +3,7 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     const React = require('react')
     const E = React.createElement
-    const { useState, useEffect, useRef, useCallback, useMemo } = React
+    const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } = React
 
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
@@ -737,6 +737,11 @@ window.__ModuleLoader__.load({
 
       const aliveRef = useRef(true)
       const lastSigRef = useRef(null)
+      const bodyRef = useRef(null)
+      // 刷新会替换整个历史列表，先把用户正在看的那一行记下来，落库后再对回去
+      const pendingAnchorRef = useRef(null)
+      const entriesRef = useRef([])
+      const offsetsRef = useRef({ list: [], total: 0 })
       useEffect(() => {
         aliveRef.current = true
         return () => { aliveRef.current = false }
@@ -757,11 +762,27 @@ window.__ModuleLoader__.load({
         }
       }, [cwd])
 
+      const captureAnchor = () => {
+        const node = bodyRef.current
+        if (node === null || node.scrollTop <= 0) return null
+        const top = node.scrollTop
+        const list = offsetsRef.current.list
+        const items = entriesRef.current
+        for (let i = 0; i < items.length; i++) {
+          if (list[i] + ROW_H > top) return { hash: items[i].hash, delta: top - list[i] }
+        }
+        return null
+      }
+
       const refreshLog = useCallback(async () => {
         if (cwd === '') return
         try {
-          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: 0 })
+          // 已经往下翻过的部分要一起取回来，否则刷新会把列表截回第一页
+          const limit = Math.max(PAGE_SIZE, entriesRef.current.length)
+          const anchor = captureAnchor()
+          const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
+          pendingAnchorRef.current = anchor
           setEntries(Array.isArray(data.entries) ? data.entries : [])
           setHasMore(data.hasMore === true)
           setError(null)
@@ -800,8 +821,6 @@ window.__ModuleLoader__.load({
           const signature = signatureOf(view)
           if (signature === lastSigRef.current) return
           lastSigRef.current = signature
-          // 仓库状态在面板之外被改动时，已展开的详情可能已过期，先收起再拉历史
-          setSelected(null)
           await refreshLog()
         }, POLL_MS)
         return () => { stopped = true; clearInterval(timer) }
@@ -955,6 +974,21 @@ window.__ModuleLoader__.load({
         return { list: list, total: y }
       }, [entries, selected])
 
+      entriesRef.current = entries
+      offsetsRef.current = offsets
+
+      // 列表替换后把锚点那一行对回原来的滚动位置；用户停在顶部时不干预
+      useLayoutEffect(() => {
+        const anchor = pendingAnchorRef.current
+        if (anchor === null) return
+        pendingAnchorRef.current = null
+        const node = bodyRef.current
+        if (node === null) return
+        const index = entries.findIndex((item) => item.hash === anchor.hash)
+        if (index < 0) return
+        node.scrollTop = offsets.list[index] + anchor.delta
+      }, [entries, offsets])
+
       const svgHeight = offsets.total
       // 抽屉展开的那一行在列表里的下标，用于判断某条连线是否跨过抽屉区间
       const selectedIndex = useMemo(() => {
@@ -1087,7 +1121,7 @@ window.__ModuleLoader__.load({
             loading: diffView.loading === true,
             onBack: () => setDiffView(null),
           })
-        : E('div', { className: 'gw-graph-body', onScroll: onScroll },
+        : E('div', { className: 'gw-graph-body', onScroll: onScroll, ref: bodyRef },
             entries.length === 0
               ? E('div', { className: 'gw-empty' }, summary !== null && summary.empty === true ? t('noCommits') : t('noCommits'))
               : E('div', { className: 'gw-canvas', style: { height: svgHeight + 'px' } },
