@@ -53,10 +53,26 @@ window.__ModuleLoader__.load({
 .gw-check input { margin:0; cursor:pointer; }
 
 .gw-changes { flex:1 1 auto; min-height:0; overflow:auto; padding-bottom:4px; }
+.gw-badge { flex:none; min-width:16px; height:16px; padding:0 5px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center; border-radius:8px;
+  font-size:10px; font-weight:600; line-height:1;
+  background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-secondary); }
+.gw-group-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-group-actions { flex:none; display:flex; align-items:center; gap:2px; }
 .gw-group-head { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-group-head .gw-tree-dir { cursor:pointer; color:var(--dsw-alias-label-secondary); }
+.gw-group-head .gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l1);
+  margin-left:13px; padding-left:4px; }
+.gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
+.gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
+.gw-mark { flex:none; width:12px; text-align:center; font-size:10px; font-weight:600;
+  font-family:var(--ds-font-family-code, ui-monospace, monospace); }
+.gw-mark-mod { color:var(--dsw-alias-state-warn-primary); }
+.gw-mark-new { color:var(--dsw-alias-state-success-primary); }
+.gw-mark-del { color:var(--dsw-alias-state-error-primary); }
+.gw-mark-conflict { color:var(--dsw-alias-state-error-primary); }
+.gw-tree-dir { cursor:pointer; color:var(--dsw-alias-label-secondary); }
 .gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:11.5px; }
 .gw-tree-dir:hover { background:var(--dsw-alias-interactive-bg-hover); }
@@ -1093,12 +1109,25 @@ window.__ModuleLoader__.load({
       let idxCode = item.index
       let workCode = item.worktree
       if (untracked) { idxCode = '?' }
+      let mark = 'M'
+      let markClass = 'gw-mark-mod'
+      if (conflicted) { mark = '!'; markClass = 'gw-mark-conflict' }
+      else if (untracked) { mark = 'U'; markClass = 'gw-mark-new' }
+      else if (workCode === 'D' || idxCode === 'D') { mark = 'D'; markClass = 'gw-mark-del' }
+      else if (staged) { mark = idxCode === 'A' ? 'A' : 'M'; markClass = 'gw-mark-new' }
+
       return E('div', { className: 'gw-file', onClick: () => props.onOpen(item), title: item.path },
-        E('span', { className: codeClass(conflicted ? 'U' : idxCode === ' ' ? '.' : idxCode) }, conflicted ? 'U' : (idxCode === ' ' || idxCode === '' ? '·' : idxCode)),
-        E('span', { className: codeClass(workCode === ' ' ? '.' : workCode) }, workCode === ' ' || workCode === '' || workCode === undefined ? '·' : workCode),
+        E('svg', {
+          className: 'gw-file-icon', width: 13, height: 13, viewBox: '0 0 16 16',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
+          strokeLinejoin: 'round', strokeLinecap: 'round',
+        },
+          E('path', { d: 'M4 1.8h4.6L12 5.2v9H4z' }),
+          E('path', { d: 'M8.6 1.8v3.4H12' })),
         E('span', { className: 'gw-file-name' },
           parts.dir === '' ? null : E('span', { className: 'gw-file-dir' }, parts.dir),
           parts.name),
+        E('span', { className: 'gw-mark ' + markClass }, mark),
         E('span', { className: 'gw-file-actions' },
           untracked || !staged
             ? E('button', {
@@ -1158,12 +1187,12 @@ window.__ModuleLoader__.load({
     function TreeRow(props) {
       const node = props.node
       const depth = props.depth
-      const pad = { paddingLeft: String(10 + depth * 12) + 'px' }
+      const pad = { paddingLeft: String(8 + (depth > 0 ? 2 : 0)) + 'px' }
       if (node.dir === false) {
         return E(FileRow, {
           item: node.item,
           t: props.t,
-          style: pad,
+          style: { paddingLeft: '8px' },
           onOpen: props.onOpen,
           onStage: props.onStage,
           onUnstage: props.onUnstage,
@@ -1178,21 +1207,26 @@ window.__ModuleLoader__.load({
           onClick: () => props.onToggleDir(node.path),
         },
           E('span', { className: 'gw-caret' }, open ? '▾' : '▸'),
-          E('span', { className: 'gw-tree-name' }, node.name),
-          E('span', { className: 'gw-count' }, ' ' + String(node.children.length))),
+          E('svg', {
+            className: 'gw-dir-icon', width: 13, height: 13, viewBox: '0 0 16 16',
+            fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinejoin: 'round',
+          },
+            E('path', { d: open ? 'M1.8 4.2h4l1.4 1.6h7v6.4H1.8z' : 'M1.8 4.2h4l1.4 1.6h7v6.4H1.8z' })),
+          E('span', { className: 'gw-tree-name' }, node.name)),
         open
-          ? node.children.map((child, index) => E(TreeRow, {
-              key: child.path + ':' + String(index),
-              node: child,
-              depth: depth + 1,
-              t: props.t,
-              collapsed: props.collapsed,
-              onToggleDir: props.onToggleDir,
-              onOpen: props.onOpen,
-              onStage: props.onStage,
-              onUnstage: props.onUnstage,
-              onDiscard: props.onDiscard,
-            }))
+          ? E('div', { className: 'gw-tree-kids' },
+              node.children.map((child, index) => E(TreeRow, {
+                key: child.path + ':' + String(index),
+                node: child,
+                depth: depth + 1,
+                t: props.t,
+                collapsed: props.collapsed,
+                onToggleDir: props.onToggleDir,
+                onOpen: props.onOpen,
+                onStage: props.onStage,
+                onUnstage: props.onUnstage,
+                onDiscard: props.onDiscard,
+              })))
           : null)
     }
 
@@ -1202,11 +1236,10 @@ window.__ModuleLoader__.load({
       return E('div', null,
         E('div', { className: 'gw-group-head', onClick: props.onToggle },
           E('span', { className: 'gw-caret' }, props.open ? '▾' : '▸'),
-          E('span', null, props.title),
-          E('span', { className: 'gw-count' }, ' ' + items.length),
-          props.action === undefined || props.action === null
-            ? null
-            : E('span', { className: 'gw-group-actions' }, props.action)),
+          E('span', { className: 'gw-group-title' }, props.title),
+          E('span', { className: 'gw-badge' }, String(items.length)),
+          E('span', { className: 'gw-group-actions' },
+            props.action === undefined || props.action === null ? null : props.action)),
         props.open === false ? null : props.tree === true
           ? buildTree(items).map((node, index) => E(TreeRow, {
               key: 't' + String(index),
@@ -2089,7 +2122,7 @@ window.__ModuleLoader__.load({
           summary === null
             ? E('div', { className: 'gw-empty' }, t('loading'))
             : changes.length === 0
-              ? E('div', { className: 'gw-empty' }, t('noChanges'))
+              ? null
               : E('div', null,
                   E(ChangeGroup, {
                     title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
