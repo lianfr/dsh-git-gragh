@@ -84,7 +84,8 @@ window.__ModuleLoader__.load({
 .gw-row:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-row-sel { background:var(--dsw-alias-interactive-bg-active); }
 .gw-row-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
-.gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px; }
+.gw-row-meta { color:var(--dsw-alias-label-tertiary); font-size:11px; flex:none; padding-right:10px;
+  font-family:var(--ds-font-family-code,ui-monospace,SFMono-Regular,Menlo,monospace); }
 
 .gw-ref { display:inline-flex; align-items:center; gap:2px; height:15px; padding:0 5px; border-radius:4px;
   font-size:10px; font-weight:500; flex:none; max-width:150px; overflow:hidden; }
