@@ -237,6 +237,9 @@ window.__ModuleLoader__.load({
 .gw-menu-item { display:flex; align-items:center; height:26px; padding:0 10px; border-radius:5px;
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
 .gw-menu-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-check { display:flex; align-items:center; gap:6px; margin-top:2px;
+  font-size:11.5px; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+.gw-check input { width:13px; height:13px; margin:0; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
 .gw-note { font-size:11.5px; line-height:1.6; color:var(--dsw-alias-label-secondary);
   margin-bottom:8px; white-space:pre-wrap; }
 .gw-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
@@ -334,6 +337,12 @@ window.__ModuleLoader__.load({
         noRepo: '当前工作目录不是 Git 仓库',
         loading: '加载中…',
         files: '个文件',
+        createBranchAt: '在提交 {hash} 上新建分支',
+        addTagAt: '在提交 {hash} 上新建标签',
+        nameLabel: '名称',
+        checkoutAfter: 'Checkout',
+        createBranch: '创建分支',
+        createTag: '创建标签',
         addTag: '新建标签…',
         cherryPickHere: 'Cherry-pick 此提交…',
         revertHere: 'Revert 此提交…',
@@ -408,6 +417,12 @@ window.__ModuleLoader__.load({
         noRepo: 'Current directory is not a Git repository',
         loading: 'Loading…',
         files: 'files',
+        createBranchAt: 'Create branch at commit {hash}',
+        addTagAt: 'Add tag at commit {hash}',
+        nameLabel: 'Name',
+        checkoutAfter: 'Check out',
+        createBranch: 'Create Branch',
+        createTag: 'Create Tag',
         addTag: 'Add tag…',
         cherryPickHere: 'Cherry-pick this commit…',
         revertHere: 'Revert this commit…',
@@ -1123,6 +1138,13 @@ window.__ModuleLoader__.load({
     function AskDialog(props) {
       const t = props.t
       const [value, setValue] = useState(props.initial === undefined ? '' : props.initial)
+      const [checked, setChecked] = useState(props.checked === true)
+      const hasInput = props.input === true
+
+      const confirm = () => {
+        if (hasInput && value.trim() === '') return
+        props.onOk({ text: value.trim(), checked: checked })
+      }
 
       return E('div', {
         className: 'gw-scrim',
@@ -1130,17 +1152,24 @@ window.__ModuleLoader__.load({
       },
         E('div', { className: 'gw-card' },
           E('div', { className: 'gw-card-head' }, E('span', { className: 'gw-card-title' }, props.title)),
-          E('div', { className: 'gw-card-body' },
-            props.message === undefined ? null : E('div', { className: 'gw-note' }, props.message),
-            props.input === true ? E('input', {
-              className: 'gw-input',
-              autoFocus: true,
-              value: value,
-              onChange: (event) => setValue(event.target.value),
-              onKeyDown: (event) => {
-                if (event.key === 'Enter' && value.trim() !== '') props.onOk(value.trim())
-              },
-            }) : null),
+          E('div', { className: 'gw-card-body gw-pad' },
+            props.note === undefined ? null : E('div', { className: 'gw-note' }, props.note),
+            hasInput ? E('label', { className: 'gw-field' },
+              E('span', null, props.inputLabel === undefined ? '' : props.inputLabel),
+              E('input', {
+                className: 'gw-input',
+                autoFocus: true,
+                value: value,
+                onChange: (event) => setValue(event.target.value),
+                onKeyDown: (event) => { if (event.key === 'Enter') confirm() },
+              })) : null,
+            props.check === true ? E('label', { className: 'gw-check' },
+              E('input', {
+                type: 'checkbox',
+                checked: checked,
+                onChange: (event) => setChecked(event.target.checked),
+              }),
+              E('span', null, props.checkLabel === undefined ? '' : props.checkLabel)) : null),
           E('div', { className: 'gw-card-foot' },
             E('button', {
               className: 'gw-btn gw-btn-ghost gw-btn-sm',
@@ -1148,7 +1177,8 @@ window.__ModuleLoader__.load({
             }, t('cancel')),
             E('button', {
               className: 'gw-btn gw-btn-sm' + (props.danger === true ? ' gw-btn-danger' : ' gw-btn-primary'),
-              onClick: () => props.onOk(value.trim()),
+              disabled: hasInput && value.trim() === '',
+              onClick: confirm,
             }, props.confirmLabel === undefined ? t('ok') : props.confirmLabel))))
     }
 
@@ -1644,11 +1674,18 @@ window.__ModuleLoader__.load({
 
       const onBranch = useCallback((entry) => {
         setAsk({
-          title: t('branchHere'), input: true, initial: '', confirmLabel: t('save'),
-          run: (value) => {
-            if (value === '') return
+          title: t('createBranchAt', { hash: entry.short }),
+          input: true,
+          inputLabel: t('nameLabel'),
+          check: true,
+          checkLabel: t('checkoutAfter'),
+          checked: true,
+          confirmLabel: t('createBranch'),
+          run: (values) => {
             void run(async () => {
-              await api('createBranch', { cwd: cwd, name: value, startPoint: entry.hash, checkout: true })
+              await api('createBranch', {
+                cwd: cwd, name: values.text, startPoint: entry.hash, checkout: values.checked,
+              })
               await refreshAll()
             })
           },
@@ -1679,8 +1716,11 @@ window.__ModuleLoader__.load({
         }
         if (kind === 'tag') {
           setAsk({
-            title: t('addTag'), input: true, initial: '', confirmLabel: t('save'),
-            run: (value) => { if (value !== '') perform('tagCreate', { name: value })() },
+            title: t('addTagAt', { hash: entry.short }),
+            input: true,
+            inputLabel: t('nameLabel'),
+            confirmLabel: t('createTag'),
+            run: (values) => perform('tagCreate', { name: values.text })(),
           })
           return
         }
@@ -1691,7 +1731,7 @@ window.__ModuleLoader__.load({
         if (kind === 'revert') {
           setAsk({
             title: t('revertHere'),
-            message: t('revertNote', { subject: entry.subject }),
+            note: t('revertNote', { subject: entry.subject }),
             confirmLabel: t('ok'),
             run: perform('revertCommit'),
           })
@@ -1700,7 +1740,7 @@ window.__ModuleLoader__.load({
         if (kind === 'drop') {
           setAsk({
             title: t('dropHere'),
-            message: t('dropNote', { subject: entry.subject }),
+            note: t('dropNote', { subject: entry.subject }),
             danger: true,
             confirmLabel: t('dropHere'),
             run: perform('dropCommit', { confirm: true }),
@@ -1710,7 +1750,7 @@ window.__ModuleLoader__.load({
         if (kind === 'rebase') {
           setAsk({
             title: t('rebaseOntoHere'),
-            message: t('rebaseNote'),
+            note: t('rebaseNote'),
             confirmLabel: t('ok'),
             run: perform('rebaseOnto'),
           })
@@ -1719,7 +1759,7 @@ window.__ModuleLoader__.load({
         if (kind === 'reset') {
           setAsk({
             title: t('resetToHere'),
-            message: t('resetNote'),
+            note: t('resetNote'),
             danger: true,
             confirmLabel: t('ok'),
             run: perform('resetTo', { mode: 'hard', confirm: true }),
@@ -2005,11 +2045,16 @@ window.__ModuleLoader__.load({
           title: ask.title,
           message: ask.message,
           input: ask.input === true,
+          inputLabel: ask.inputLabel,
+          check: ask.check === true,
+          checkLabel: ask.checkLabel,
+          checked: ask.checked === true,
+          note: ask.note,
           initial: ask.initial,
           danger: ask.danger === true,
           confirmLabel: ask.confirmLabel,
           onCancel: () => setAsk(null),
-          onOk: (value) => { const run = ask.run; setAsk(null); run(value) },
+          onOk: (values) => { const run = ask.run; setAsk(null); run(values) },
         }),
         remoteOpen === false ? null : E(RemoteDialog, {
           t: t,
