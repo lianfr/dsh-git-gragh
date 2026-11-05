@@ -442,6 +442,9 @@ window.__ModuleLoader__.load({
         showOutput: '显示 Git 输出',
         remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
+        checkoutHint: '填分支名、标签名或提交哈希',
+        refLabel: '目标',
+        tagHint: '标记会打在最新一次提交上',
         openFile: '打开文件',
         ignoreFile: '加入忽略',
         ignoreAll: '全部加入忽略',
@@ -578,6 +581,9 @@ window.__ModuleLoader__.load({
         showOutput: 'Show Git output',
         remotes: 'Remotes',
         openInTerminal: 'Open repository in terminal',
+        checkoutHint: 'Branch, tag, or commit hash',
+        refLabel: 'Target',
+        tagHint: 'The tag is created on the latest commit',
         openFile: 'Open file',
         ignoreFile: 'Add to .gitignore',
         ignoreAll: 'Add all to .gitignore',
@@ -2640,7 +2646,42 @@ window.__ModuleLoader__.load({
             className: 'gw-menu',
             style: { top: morePos.top + 'px', right: morePos.right + 'px' },
           },
-            menuRow(t('remotes'), () => { setMoreOpen(false); setRemoteOpen(true) }),
+            menuRow(t('checkoutTo') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('checkoutTo'),
+                note: t('checkoutHint'),
+                input: true,
+                inputLabel: t('refLabel'),
+                confirmLabel: t('checkoutTo'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('checkout', { cwd: cwd, target: values.text }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('createBranchItem') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('createBranchItem'),
+                input: true,
+                inputLabel: t('nameLabel'),
+                check: true,
+                checkLabel: t('checkoutAfter'),
+                checked: true,
+                confirmLabel: t('createBranch'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('createBranch', { cwd: cwd, name: values.text, checkout: values.checked }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('tagCreateItem') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('tagCreateItem'),
+                note: t('tagHint'),
+                input: true,
+                inputLabel: t('nameLabel'),
+                confirmLabel: t('createTag'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('tagCreate', { cwd: cwd, name: values.text, hash: headHash === null ? 'HEAD' : headHash }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
             menuRow(t('openInTerminal'), () => {
               setMoreOpen(false)
               setAsk({
