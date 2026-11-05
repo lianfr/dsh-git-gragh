@@ -1,5 +1,5 @@
 {
-  "name": "dsh-git-workbench",
+  "name": "dsh-git-graph",
   "version": "0.1.0",
   "description": "DSH plugin: a Git workbench as a native dsh-better-sidebar tab — commit graph with a pinned main lane, plus changes and commit in one column. | DSH 插件：侧边栏 Git 工作台——主分支锁定列的提交图，变更与提交同栏。",
   "type": "module",

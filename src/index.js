@@ -1,9 +1,9 @@
 /**
- * dsh-git-workbench — host 半（纯 JavaScript，无构建）。
+ * dsh-git-graph — host 半（纯 JavaScript，无构建）。
  *
  * 一个 HTTP 面支撑浏览器面板：
  *
- *   POST /dsh-git-workbench/api/<method>  ->  { ok: true, data } | { ok: false, error }
+ *   POST /dsh-git-graph/api/<method>  ->  { ok: true, data } | { ok: false, error }
  *
  * 每个方法都是对本地 git 的薄封装，参数走 argv 数组（永远不拼 shell 字符串），
  * 工作目录由客户端传入（会话 scope 的 cwd）并校验为绝对路径。
@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url'
 import { GitError, gitExecutable, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
 
-export const name = 'dsh-git-workbench'
+export const name = 'dsh-git-graph'
 export const inject = ['webServer']
 
 /* 插件的行内配置。宿主的插件详情页会把这里的每个字段渲染成一个设置项，
@@ -65,7 +65,7 @@ export const Config = Schema === null ? undefined : Schema.object({
    于是面板与插件详情页读的是同一份值，不用两边各存一套。 */
 let currentConfig = {}
 
-const ROUTE_PREFIX = '/dsh-git-workbench/api'
+const ROUTE_PREFIX = '/dsh-git-graph/api'
 const LOG_FORMAT = ['%H', '%h', '%P', '%an', '%ae', '%at', '%D', '%s'].join(LOG_FIELD) + LOG_RECORD
 const DETAIL_FORMAT = ['%H', '%h', '%P', '%an', '%ae', '%at', '%cn', '%ce', '%ct', '%D', '%B'].join(LOG_FIELD)
 const BRANCH_FORMAT = '%(refname)' + LOG_FIELD + '%(objectname)' + LOG_FIELD + '%(HEAD)' + LOG_FIELD + '%(upstream:short)'
@@ -797,6 +797,6 @@ export function apply(ctx, config) {
   currentConfig = config === undefined || config === null ? {} : config
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: handle }),
-    'dsh-git-workbench: /dsh-git-workbench/api git 路由',
+    'dsh-git-graph: /dsh-git-graph/api git 路由',
   )
 }

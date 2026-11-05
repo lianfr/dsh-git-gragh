@@ -1,5 +1,5 @@
 {
-  "id": "dsh-external/dsh-git-workbench",
+  "id": "dsh-external/dsh-git-graph",
   "version": "0.1.0",
   "main": "./src/index.js",
   "description": "侧边栏 Git 工作台：主分支锁定列的提交图、提交详情、变更与提交。",
