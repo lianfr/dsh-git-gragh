@@ -143,7 +143,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-dd-scrim { position:fixed; inset:0; z-index:70; }
 .gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
   box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-lg, 16px);
-  border:none; background:var(--dsw-alias-bg-layer-2);
+  border:none; background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   box-shadow:0 12px 32px rgba(0, 0, 0, .18); }
 .gw-dd-item { display:flex; align-items:center; justify-content:space-between; gap:10px;
   width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
@@ -267,9 +267,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   color:var(--dsw-alias-label-tertiary); cursor:pointer; opacity:0; }
 .gw-row:hover .gw-act, .gw-file:hover .gw-act, .gw-group-head:hover .gw-act { opacity:1; }
 .gw-act { position:relative; }
+/* 提示框用不透明色：宿主的底色变量带透明度，浮在提交行上会透出底下的字。
+   深浅两套直接写死，由面板根据主题挂 gw-dark 切换。 */
+.gw-dark .gw-act::after, .gw-dark .gw-icon::after {
+  background:#2b2d31; color:#f2f3f5; border-color:rgba(255,255,255,.14); }
 .gw-act::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:5px 8px; border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
-  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  background:#ffffff; color:#1b1c1f;
+  border:1px solid rgba(0,0,0,.12);
   font-size:11px; line-height:1.3; white-space:nowrap; pointer-events:none;
   box-shadow:0 2px 8px rgba(0,0,0,.28); opacity:0; visibility:hidden;
   transition:opacity .12s ease, visibility .12s ease; z-index:10000; }
@@ -281,12 +286,13 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
 .gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
-.gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
+/* 不用 opacity 表示禁用：父元素的透明度会连 ::after 的提示框一起变半透明。 */
+.gw-icon:disabled { color:color-mix(in srgb, var(--dsw-alias-label-tertiary) 42%, transparent); cursor:default; background:transparent; }
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:3px 7px; border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
-  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
-  border:1px solid var(--dsw-alias-border-l2); box-shadow:0 4px 14px rgba(0,0,0,.22);
+  background:#ffffff; color:#1b1c1f;
+  border:1px solid rgba(0,0,0,.12); box-shadow:0 4px 14px rgba(0,0,0,.22);
   font-size:11px; font-weight:400; line-height:1.4; white-space:nowrap;
   opacity:0; visibility:hidden; pointer-events:none; transition:opacity .12s ease; z-index:10000; }
 .gw-icon:hover::after { opacity:1; visibility:visible; }
@@ -429,7 +435,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   border:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent);
   box-shadow:0 6px 18px rgba(0,0,0,.16); pointer-events:auto;
   display:flex; align-items:center; gap:8px;
-  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 3.1s forwards; }
+  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 9.5s forwards; }
 .gw-err-text { flex:1 1 auto; min-width:0; }
 .gw-err-close { flex:none; display:flex; align-items:center; justify-content:center;
   width:16px; height:16px; padding:0; border:none; border-radius:50%; background:transparent;
@@ -448,7 +454,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
    对话框用面板级圆角、无边框、二十像素横向内距。 */
 .gw-menu { position:fixed; z-index:9999; min-width:156px; padding:4px;
   border-radius:var(--dsw-radius-xl, 20px);
-  background:var(--dsw-alias-bg-layer-3);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   border:.5px solid var(--dsw-alias-border-l2);
   box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
 .gw-menu-item { display:flex; align-items:center; padding:6px 8px; line-height:18px;
@@ -471,7 +477,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-menu-off { opacity:.45; cursor:default; }
 .gw-menu-sub { display:none; position:absolute; left:calc(100% + 10px); bottom:-4px; min-width:163px;
   padding:4px; border-radius:var(--dsw-radius-xl, 20px); border:.5px solid var(--dsw-alias-border-l2);
-  background:var(--dsw-alias-bg-layer-3);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   box-shadow:var(--dsw-elevation-prominent, 0 12px 28px rgba(0,0,0,.3)); z-index:20; }
 .gw-menu-parent:hover > .gw-menu-sub { display:block; }
 .gw-menu-sep { height:1px; margin:4px 7px; background:var(--dsw-alias-border-l1); }
@@ -480,7 +486,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-card { width:100%; max-width:min(380px, 100%); max-height:100%; box-sizing:border-box;
   display:flex; flex-direction:column; overflow:hidden; padding:0 0 24px;
   border-radius:var(--dsw-radius-panel, 28px); border:none;
-  background:var(--dsw-alias-bg-layer-2); box-shadow:var(--dsw-elevation-prominent); }
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff)); box-shadow:var(--dsw-elevation-prominent); }
 /* 设置页要多放几项，单独放宽 */
 .gw-card.gw-card-wide { max-width:min(560px, 100%); }
 .gw-card-head { display:flex; align-items:center; gap:8px; padding:22px 14px 12px 24px;
@@ -514,7 +520,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-field > span { font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
 .gw-input { height:34px; padding:0 12px; font-size:13px; line-height:1.5; box-sizing:border-box;
   border-radius:var(--dsw-radius-md, 12px);
-  border:.5px solid var(--dsw-alias-border-l4); background:var(--dsw-alias-bg-layer-3);
+  border:.5px solid var(--dsw-alias-border-l4); background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   color:var(--dsw-alias-label-primary); outline:none;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-input:focus { border-color:var(--dsw-alias-brand-primary); }
@@ -536,6 +542,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     const DICT = {
       zh: {
         title: 'Git',
+        rightbarDesc: '在右侧栏里查看提交图、管理更改与提交',
         description: '提交图与变更管理',
         commitPlaceholder: '写点提交信息…',
         commit: '提交',
@@ -560,13 +567,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settings: '设置',
         openPluginSettings: '打开插件设置',
         pollLabel: '自动刷新',
-    pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
-    pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
-    uncommittedLabel: '显示未提交的更改',
-    uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
-    confirmDiscardLabel: '撤销前确认',
-    confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
+        pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
+        pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
+        uncommittedLabel: '显示未提交的更改',
+        uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
+        confirmDiscardLabel: '撤销前确认',
+        confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
     showUncommitted: '显示未提交的更改',
+        seconds: '{n} 秒',
         pageLabel: '每页条数',
         off: '关闭',
         clone: '克隆…',
@@ -690,6 +698,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       },
       en: {
         title: 'Git',
+        rightbarDesc: 'Review the commit graph and manage changes in the right sidebar',
         description: 'Commit graph and changes',
         commitPlaceholder: 'Commit message',
         commit: 'Commit',
@@ -714,13 +723,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settings: 'Settings',
         openPluginSettings: 'Open plugin settings',
         pollLabel: 'Auto refresh',
-      pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
-      pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
-      uncommittedLabel: 'Show uncommitted changes',
-      uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
-      confirmDiscardLabel: 'Confirm before discarding',
-      confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
+        pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
+        pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
+        uncommittedLabel: 'Show uncommitted changes',
+        uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
+        confirmDiscardLabel: 'Confirm before discarding',
+        confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
       showUncommitted: 'Show uncommitted changes',
+        seconds: '{n} seconds',
         pageLabel: 'Rows per page',
         off: 'Off',
         clone: 'Clone…',
@@ -871,6 +881,17 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         }
         return text
       }
+    }
+
+    /* 语言一变就重渲染：locale 服务的 subscribe 在切换语言和注册字典时都会回调。 */
+    function useLocaleRevision(ctx) {
+      const [revision, setRevision] = useState(0)
+      useEffect(() => {
+        const locale = ctx === undefined || ctx === null ? undefined : ctx.get('locale')
+        if (locale === undefined || locale === null || typeof locale.subscribe !== 'function') return undefined
+        return locale.subscribe(() => setRevision((value) => value + 1))
+      }, [ctx])
+      return revision
     }
 
     /* ------------------------------------------------------------------ */
@@ -1554,7 +1575,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             E('div', { className: 'gw-set-list' },
               pick('poll', t('pollLabel'), t('pollDesc'), PREFS_POLL.map((value) => ({
                 value: String(value),
-                label: value === 0 ? t('off') : String(value / 1000) + ' 秒',
+                label: value === 0 ? t('off') : t('seconds', { n: value / 1000 }),
               })), poll, setPoll),
               pick('page', t('pageLabel'), t('pageDesc'), PREFS_PAGE.map((value) => ({
                 value: String(value),
@@ -2093,6 +2114,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     /* ------------------------------------------------------------------ */
 
     function GitPanel(props) {
+      useLocaleRevision(props.ctx)
       const ctx = props.ctx
       const t = translatorOf(ctx)
       const scope = props.scope !== undefined && props.scope !== null ? props.scope : {}
@@ -2110,6 +2132,27 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [entries, setEntries] = useState([])
       const [hasMore, setHasMore] = useState(false)
       const [loadingMore, setLoadingMore] = useState(false)
+      /* 宿主的主题变量是透明色，提示框没法直接拿来当底；这里探一次当前明暗，
+         挂个类名给提示框选不透明色。切主题时根元素会变，顺便重探。 */
+      const [dark, setDark] = useState(() => window.matchMedia !== undefined && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      useEffect(() => {
+        const read = () => {
+          const probe = document.createElement('span')
+          probe.style.cssText = 'position:absolute;left:-9999px;top:0;color:var(--dsw-alias-label-primary)'
+          document.body.appendChild(probe)
+          const rgb = window.getComputedStyle(probe).color
+          probe.remove()
+          const parts = rgb.match(/\d+(\.\d+)?/g)
+          if (parts === null || parts.length < 3) return
+          const lum = Number(parts[0]) * 0.299 + Number(parts[1]) * 0.587 + Number(parts[2]) * 0.114
+          setDark(lum > 140)
+        }
+        read()
+        const watcher = new MutationObserver(read)
+        watcher.observe(document.documentElement, { attributes: true })
+        return () => watcher.disconnect()
+      }, [])
+
       const [error, setError] = useState(null)
       const errorSeq = useRef(0)
       const errorTimer = useRef(null)
@@ -2131,16 +2174,32 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             const data = await api('settings', {})
             if (alive === false || data === null || data === undefined) return
             let stored = false
+            let seen = -1
             try {
-              stored = globalThis.localStorage !== undefined
-                && globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+              if (globalThis.localStorage !== undefined) {
+                stored = globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+                const raw = globalThis.localStorage.getItem('gw-cfg-rev:' + cwd)
+                seen = raw === null ? -1 : Number(raw)
+              }
             } catch (error) {
               void error
             }
-            if (stored === true) return
+            const revision = typeof data.revision === 'number' ? data.revision : -1
+            /* 详情页的设置刚被改过就把本地的临时覆盖让掉，否则改了看不到反应。 */
+            const changed = revision !== -1 && revision !== seen
+            try {
+              if (globalThis.localStorage !== undefined && revision !== -1) {
+                globalThis.localStorage.setItem('gw-cfg-rev:' + cwd, String(revision))
+              }
+            } catch (error) {
+              void error
+            }
+            if (stored === true && changed === false) return
             setPrefs({
               poll: typeof data.pollMs === 'number' ? data.pollMs : 3000,
               page: typeof data.pageSize === 'number' ? data.pageSize : 100,
+              showUncommitted: data.showUncommitted !== false,
+              confirmDiscard: data.confirmDiscard !== false,
             })
           } catch (failure) {
             void failure
@@ -2185,7 +2244,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         errorTimer.current = setTimeout(() => {
           errorTimer.current = null
           if (aliveRef.current) clearError()
-        }, 3600)
+        }, 10000)
       }, [])
 
       const clearError = useCallback(() => {
@@ -2310,11 +2369,11 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         try {
           await fn()
         } catch (failure) {
-          setError(failure.message)
+          showError(failure.message)
         } finally {
           if (aliveRef.current) setBusy(false)
         }
-      }, [])
+      }, [clearError, showError])
 
       const selectCommit = useCallback(async (entry) => {
         if (selected === entry.hash) {
@@ -2500,7 +2559,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
         if (error === null) return undefined
-        const timer = setTimeout(() => { if (aliveRef.current) clearError() }, 4100)
+        const timer = setTimeout(() => { if (aliveRef.current) clearError() }, 10000)
         return () => clearTimeout(timer)
       }, [error])
 
@@ -2807,7 +2866,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       }
 
       if (cwd === '') {
-        return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
+        return E('div', { className: 'gw-root' + (dark ? ' gw-dark' : '') }, E('div', { className: 'gw-empty' }, t('noRepo')))
       }
 
       const isRepo = summary !== null && summary.isRepo === true
@@ -3101,7 +3160,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
                         onOpenFile: openCommitDiff,
                       })))
 
-      return E('div', { className: 'gw-root' },
+      return E('div', { className: 'gw-root' + (dark ? ' gw-dark' : '') },
         isRepo === false
           ? E('div', { className: 'gw-empty' }, t('noRepo'))
           : E('div', { style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 } },
@@ -3246,8 +3305,9 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
      * 侧边栏自带的 diff 标签只认单个文件或整次提交，这一组得自己画。
      */
     function FilesTab(props) {
-      const t = props.t
       const ctx = props.ctx
+      const t = translatorOf(ctx)
+      useLocaleRevision(ctx)
       const scope = props.scope
       const tab = props.tab
       const meta = tab === undefined || tab === null || tab.meta === undefined || tab.meta === null ? {} : tab.meta
@@ -3383,6 +3443,41 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         E('path', { d: 'M17 11.1v.9a3.2 3.2 0 0 1-3.2 3.2H9.2' }))
     }
 
+    /* 右侧栏：不依赖 better-sidebar 的那条路。注册一种 tab 类型，它会出现在
+       右侧栏的「更多工具」里，点开就在右侧栏显示；better-sidebar 在时它自己
+       那条注册也照旧，两边互不影响。 */
+    const RIGHTBAR_KIND = 'git-graph-panel'
+    const RIGHTBAR_ID = 'dsh-git-graph/rightbar'
+
+    function RightbarBody(props) {
+      const ctx = props.ctx
+      const sessionId = typeof props.sessionId === 'string' ? props.sessionId : ''
+      const workspaces = typeof props.useWorkspaces === 'function'
+        ? props.useWorkspaces((state) => state.items) : null
+      let cwd = ''
+      if (sessionId !== '') {
+        const found = sessionCwdOf(ctx, sessionId)
+        if (found !== undefined) cwd = found
+      }
+      if (cwd === '' && Array.isArray(workspaces)) {
+        for (let i = 0; i < workspaces.length; i += 1) {
+          const item = workspaces[i]
+          if (item === null || typeof item !== 'object') continue
+          if (!Array.isArray(item.sessionIds) || item.sessionIds.indexOf(sessionId) < 0) continue
+          if (typeof item.path === 'string' && item.path !== '') {
+            cwd = item.path
+            break
+          }
+        }
+      }
+      if (cwd === '') {
+        const t = ctx === undefined || ctx === null ? (key) => key : translatorOf(ctx)
+        return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
+      }
+      return E(GitPanel, { ctx: ctx, scope: { sessionId: sessionId, cwd: cwd }, visible: true })
+    }
+
+
     function apply(ctx) {
       injectStyles()
       ctx.inject(['betterSidebar'], (tabCtx) => {
@@ -3429,6 +3524,54 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             if (typeof offOutput === 'function') offOutput()
           }
         }, 'dsh-git-graph: sidebar tab')
+      })
+
+      /* 右侧栏入口：走宿主自带的 sidebar-right，与 better-sidebar 无关。
+         两个依赖必须写进 inject——不写的话 inject 回调会在服务还没就绪时执行，
+         get 拿到 undefined，整块注册静默退出（这也是「更多工具」里什么都看不到的原因）。 */
+      ctx.inject(['sidebarRightTabs', 'slots'], (rightCtx) => {
+        const tabs = rightCtx.get('sidebarRightTabs')
+        const slots = rightCtx.get('slots')
+        if (tabs === undefined || typeof tabs.register !== 'function') return
+        if (slots === undefined || typeof slots.inject !== 'function') return
+        rightCtx.effect(() => {
+          /* better-sidebar 会把它的每个 tab 也注册成原生右侧栏的 kind，用的就是 tab id。
+             它在的时候自己就把 Git 挂上去了，这里再注册一遍会在「开始」页多出一张卡片，
+             而且 kind 撞车会直接报错——所以它在就让位。 */
+          const native = rightCtx.get('betterSidebar')
+          if (native !== undefined) return undefined
+          const t = translatorOf(rightCtx)
+          const offType = tabs.register({
+            id: RIGHTBAR_ID,
+            kind: RIGHTBAR_KIND,
+            title: () => t('title'),
+            guide: [{
+              id: 'git-graph',
+              order: 30,
+              title: () => t('title'),
+              description: () => t('rightbarDesc'),
+              icon: (iconProps) => E(TabIcon, {
+                size: iconProps === undefined || iconProps.size === undefined ? 16 : iconProps.size,
+              }),
+            }],
+          })
+          const offBody = slots.inject('sidebar.right.pane.tab', () => slots.register(
+            { name: 'sidebar.right.pane.tab', key: RIGHTBAR_ID },
+            (tabProps) => E(RightbarBody, Object.assign({}, tabProps, { ctx: ctx, t: t })),
+          ))
+          return () => {
+            try {
+              offBody()
+            } catch (error) {
+              void error
+            }
+            try {
+              offType()
+            } catch (error) {
+              void error
+            }
+          }
+        }, 'dsh-git-graph: 右侧栏')
       })
     }
 
