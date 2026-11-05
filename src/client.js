@@ -1127,7 +1127,7 @@ window.__ModuleLoader__.load({
 
       return E('div', {
         className: 'gw-file ' + tone,
-        onClick: () => props.onOpen(item),
+        onClick: () => props.onOpenEditor(item),
         title: item.path,
       },
         E('svg', {
