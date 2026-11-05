@@ -65,7 +65,8 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
-.gw-group-head .gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l2);
+/* 树容器是分组标题的兄弟节点，不是它的子节点，所以不能挂在 .gw-group-head 下。 */
+.gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l2);
   margin-left:14px; padding-left:0; }
 .gw-file-lead { width:12px; flex:none; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
