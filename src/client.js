@@ -65,8 +65,9 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
-.gw-group-head .gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l1);
-  margin-left:13px; padding-left:4px; }
+.gw-group-head .gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l2);
+  margin-left:14px; padding-left:0; }
+.gw-file-lead { width:12px; flex:none; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
 .gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
 .gw-file.gw-tone-new .gw-file-name { color:var(--dsw-alias-state-success-primary); }
@@ -1256,7 +1257,7 @@ window.__ModuleLoader__.load({
 
     function FileRow(props) {
       const item = props.item
-      const extra = props.style === undefined ? null : props.style
+      const extra = props.style === undefined ? {} : props.style
       const t = props.t
       const parts = dirAndName(item.path)
       const conflicted = item.conflicted === true
@@ -1275,9 +1276,11 @@ window.__ModuleLoader__.load({
 
       return E('div', {
         className: 'gw-file ' + tone,
+        style: extra,
         onClick: () => props.onOpenEditor(item),
         title: item.path,
       },
+        props.indent === true ? E('span', { className: 'gw-file-lead' }) : null,
         E('svg', {
           className: 'gw-file-icon', width: 13, height: 13, viewBox: '0 0 16 16',
           fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
@@ -1342,12 +1345,12 @@ window.__ModuleLoader__.load({
     function TreeRow(props) {
       const node = props.node
       const depth = props.depth
-      const pad = { paddingLeft: String(8 + (depth > 0 ? 2 : 0)) + 'px' }
       if (node.dir === false) {
         return E(FileRow, {
           item: node.item,
           t: props.t,
-          style: { paddingLeft: '8px' },
+          indent: true,
+          style: { paddingLeft: '0px' },
           onOpen: props.onOpen,
           onOpenEditor: props.onOpenEditor,
           onStage: props.onStage,
@@ -1359,7 +1362,7 @@ window.__ModuleLoader__.load({
       return E('div', null,
         E('div', {
           className: 'gw-file gw-tree-dir',
-          style: pad,
+          style: { paddingLeft: '0px' },
           onClick: () => props.onToggleDir(node.path),
         },
           E(Caret, { open: open }),
