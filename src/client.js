@@ -1262,33 +1262,49 @@ window.__ModuleLoader__.load({
 
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
-    /** 「显示 Git 输出」：最近执行过的命令，用于核对插件到底跑了什么。 */
-    function OutputDialog(props) {
+    /** 标签页形态的「显示 Git 输出」：最近执行过的命令，最新的在前。 */
+    function OutputTab(props) {
       const t = props.t
+      const [records, setRecords] = useState([])
+      const [token, setToken] = useState(0)
+      useEffect(() => {
+        let alive = true
+        void (async () => {
+          try {
+            const data = await api('gitRecords', { limit: 200 })
+            if (alive) setRecords(Array.isArray(data.records) ? data.records : [])
+          } catch (error) {
+            void error
+          }
+        })()
+        return () => { alive = false }
+      }, [token])
       const at = (ms) => {
         const date = new Date(ms)
         const pad = (value) => (value < 10 ? '0' + String(value) : String(value))
         return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
       }
-      return E('div', {
-        className: 'gw-scrim',
-        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
-      },
-        E('div', { className: 'gw-card gw-card-wide' },
-          E('div', { className: 'gw-card-head' },
-            E('span', { className: 'gw-card-title' }, t('showOutput')),
-            E('button', { className: 'gw-card-close', onClick: props.onRefresh }, '⟳'),
-            E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
-          E('div', { className: 'gw-card-body' },
-            props.records.length === 0
-              ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
-              : E('div', { className: 'gw-output' }, props.records.map((item, index) => E('div', {
-                key: 'o' + String(index),
-                className: 'gw-output-row' + (item.failed === true ? ' gw-output-fail' : ''),
-              },
-                E('span', { className: 'gw-output-time' }, at(item.at)),
-                E('span', { className: 'gw-output-cmd' }, item.command),
-                E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms')))))))
+      return E('div', { className: 'gw-files-tab' },
+        E('div', { className: 'gw-files-tab-bar' },
+          E('span', { className: 'gw-files-tab-title' }, t('showOutput')),
+          E('span', { className: 'gw-spacer' }),
+          E('button', {
+            className: 'gw-icon',
+            'data-tip': t('refresh'),
+            onClick: () => setToken(token + 1),
+          }, E('svg', {
+            width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
+            stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+          }, E('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5.4H10' })))),
+        records.length === 0
+          ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
+          : E('div', { className: 'gw-output' }, records.map((item, index) => E('div', {
+            key: 'o' + String(index),
+            className: 'gw-output-row' + (item.failed === true ? ' gw-output-fail' : ''),
+          },
+            E('span', { className: 'gw-output-time' }, at(item.at)),
+            E('span', { className: 'gw-output-cmd' }, item.command),
+            E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms')))))
     }
 
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
@@ -1854,8 +1870,6 @@ window.__ModuleLoader__.load({
       const [ask, setAsk] = useState(null)
       const [treeView, setTreeView] = useState(false)
       const [settingsOpen, setSettingsOpen] = useState(false)
-      const [outputOpen, setOutputOpen] = useState(false)
-      const [outputList, setOutputList] = useState([])
       const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
@@ -2134,6 +2148,17 @@ window.__ModuleLoader__.load({
 
       /** 每组标题上的批量动作，悬停才出现；冲突组没有批量操作。 */
       /* 一个分组的所有文件放进同一个差异标签页，省得一个一个点。 */
+      /** 「显示 Git 输出」开成侧边栏自己的标签页，和差异页同一个位置。 */
+      const openOutputTab = useCallback(() => {
+        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
+        if (service === undefined || service === null || typeof service.openTab !== 'function') return
+        try {
+          service.openTab({ type: 'git-workbench-output', id: 'gw-output', title: t('showOutput') }, scope)
+        } catch (error) {
+          void error
+        }
+      }, [ctx, scope, t])
+
       const openGroupDiff = useCallback((group, items) => {
         const paths = items.map((item) => item.path)
         if (paths.length === 0) return
@@ -2811,14 +2836,6 @@ window.__ModuleLoader__.load({
               })
             }),
             menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
-            menuRow(t('showOutput'), () => {
-              setMoreOpen(false)
-              setOutputOpen(true)
-              void run(async () => {
-                const data = await api('gitRecords', { limit: 200 })
-                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
-              })
-            }),
             menuRow(t('openInTerminal'), () => {
               setMoreOpen(false)
               setAsk({
@@ -2827,18 +2844,12 @@ window.__ModuleLoader__.load({
                 confirmLabel: t('close'),
                 onOk: () => {},
               })
+            }),
+            E('div', { key: 'sep-output', className: 'gw-menu-sep' }),
+            menuRow(t('showOutput'), () => {
+              setMoreOpen(false)
+              openOutputTab()
             }))),
-        outputOpen === false ? null : E(OutputDialog, {
-          t: t,
-          records: outputList,
-          onClose: () => setOutputOpen(false),
-          onRefresh: () => {
-            void run(async () => {
-              const data = await api('gitRecords', { limit: 200 })
-              if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
-            })
-          },
-        }),
         settingsOpen === false ? null : E(SettingsDialog, {
           t: t,
           prefs: prefs,
@@ -3090,9 +3101,19 @@ window.__ModuleLoader__.load({
               tab: tabProps.tab,
             }),
           })
+          /* 命令输出标签：同样隐藏，只从更多操作菜单打开。 */
+          const offOutput = betterSidebar.registerTab({
+            id: 'git-workbench-output',
+            title: () => t('showOutput'),
+            hidden: true,
+            single: true,
+            dedupeKey: () => 'git-workbench-output',
+            component: (tabProps) => E(OutputTab, { t: t, ctx: tabProps.ctx, scope: tabProps.scope, tab: tabProps.tab }),
+          })
           return () => {
             if (typeof off === 'function') off()
             if (typeof offFiles === 'function') offFiles()
+            if (typeof offOutput === 'function') offOutput()
           }
         }, 'dsh-git-workbench: sidebar tab')
       })
