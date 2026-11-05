@@ -143,7 +143,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-dd-scrim { position:fixed; inset:0; z-index:70; }
 .gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
   box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-lg, 16px);
-  border:none; background:var(--dsw-alias-bg-layer-2);
+  border:none; background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   box-shadow:0 12px 32px rgba(0, 0, 0, .18); }
 .gw-dd-item { display:flex; align-items:center; justify-content:space-between; gap:10px;
   width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
@@ -449,7 +449,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
    对话框用面板级圆角、无边框、二十像素横向内距。 */
 .gw-menu { position:fixed; z-index:9999; min-width:156px; padding:4px;
   border-radius:var(--dsw-radius-xl, 20px);
-  background:var(--dsw-alias-bg-layer-3);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   border:.5px solid var(--dsw-alias-border-l2);
   box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
 .gw-menu-item { display:flex; align-items:center; padding:6px 8px; line-height:18px;
@@ -472,7 +472,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-menu-off { opacity:.45; cursor:default; }
 .gw-menu-sub { display:none; position:absolute; left:calc(100% + 10px); bottom:-4px; min-width:163px;
   padding:4px; border-radius:var(--dsw-radius-xl, 20px); border:.5px solid var(--dsw-alias-border-l2);
-  background:var(--dsw-alias-bg-layer-3);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   box-shadow:var(--dsw-elevation-prominent, 0 12px 28px rgba(0,0,0,.3)); z-index:20; }
 .gw-menu-parent:hover > .gw-menu-sub { display:block; }
 .gw-menu-sep { height:1px; margin:4px 7px; background:var(--dsw-alias-border-l1); }
@@ -481,7 +481,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-card { width:100%; max-width:min(380px, 100%); max-height:100%; box-sizing:border-box;
   display:flex; flex-direction:column; overflow:hidden; padding:0 0 24px;
   border-radius:var(--dsw-radius-panel, 28px); border:none;
-  background:var(--dsw-alias-bg-layer-2); box-shadow:var(--dsw-elevation-prominent); }
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff)); box-shadow:var(--dsw-elevation-prominent); }
 /* 设置页要多放几项，单独放宽 */
 .gw-card.gw-card-wide { max-width:min(560px, 100%); }
 .gw-card-head { display:flex; align-items:center; gap:8px; padding:22px 14px 12px 24px;
@@ -515,7 +515,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-field > span { font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
 .gw-input { height:34px; padding:0 12px; font-size:13px; line-height:1.5; box-sizing:border-box;
   border-radius:var(--dsw-radius-md, 12px);
-  border:.5px solid var(--dsw-alias-border-l4); background:var(--dsw-alias-bg-layer-3);
+  border:.5px solid var(--dsw-alias-border-l4); background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-base, #ffffff));
   color:var(--dsw-alias-label-primary); outline:none;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-input:focus { border-color:var(--dsw-alias-brand-primary); }
