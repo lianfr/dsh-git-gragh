@@ -8,3 +8,4 @@
 - insert:
     - id: git-workbench
       name: 'dsh-git-workbench'
+      config: {}
