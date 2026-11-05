@@ -10,6 +10,30 @@ import { spawn } from 'node:child_process'
 const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 
+/* 最近执行过的 git 命令，环形保留。用于面板里的「显示 Git 输出」。 */
+const MAX_RECORDS = 300
+const records = []
+
+function remember(args, startedAt, value) {
+  const entry = { at: startedAt, ms: Date.now() - startedAt, command: 'git ' + args.join(' ') }
+  if (value instanceof Error) {
+    entry.failed = true
+    entry.message = String(value.message).slice(0, 400)
+  } else {
+    entry.code = value.code
+    entry.stdoutBytes = value.stdout.length
+    entry.stderr = value.stderr.slice(0, 400)
+  }
+  records.push(entry)
+  if (records.length > MAX_RECORDS) records.shift()
+}
+
+/** 最近的命令，最新的在前。 */
+export function recentGit(limit) {
+  const size = typeof limit === 'number' && limit > 0 ? limit : MAX_RECORDS
+  return records.slice(-size).reverse()
+}
+
 export class GitError extends Error {
   constructor(message, code = 'git-failed', status = 400) {
     super(message)
@@ -46,10 +70,12 @@ export function runGit(cwd, args, options = {}) {
     let settled = false
     let timer = null
 
+    const startedAt = Date.now()
     const finish = (handler, value) => {
       if (settled) return
       settled = true
       if (timer !== null) clearTimeout(timer)
+      remember(args, startedAt, value)
       handler(value)
     }
     const kill = () => {

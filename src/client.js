@@ -115,6 +115,14 @@ window.__ModuleLoader__.load({
 .gw-caret { width:12px; flex:none; color:var(--dsw-alias-label-tertiary); opacity:.9;
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
+.gw-card-wide { max-width:560px; }
+.gw-output { display:flex; flex-direction:column; gap:1px; font-family:var(--ds-font-family-code, ui-monospace, Menlo, monospace); font-size:11px; }
+.gw-output-row { display:flex; align-items:baseline; gap:8px; padding:3px 0;
+  border-bottom:1px solid var(--dsw-alias-border-l1); color:var(--dsw-alias-label-secondary); }
+.gw-output-time { flex:none; color:var(--dsw-alias-label-tertiary); }
+.gw-output-cmd { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-output-ms { flex:none; color:var(--dsw-alias-label-tertiary); }
+.gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
@@ -495,6 +503,7 @@ window.__ModuleLoader__.load({
         showOutput: '显示 Git 输出',
         remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
+        outputEmpty: '还没有执行过命令',
         checkoutHint: '填分支名、标签名或提交哈希',
         refLabel: '目标',
         tagHint: '标记会打在最新一次提交上',
@@ -637,6 +646,7 @@ window.__ModuleLoader__.load({
         showOutput: 'Show Git output',
         remotes: 'Remotes',
         openInTerminal: 'Open repository in terminal',
+        outputEmpty: 'No commands yet',
         checkoutHint: 'Branch, tag, or commit hash',
         refLabel: 'Target',
         tagHint: 'The tag is created on the latest commit',
@@ -1252,6 +1262,35 @@ window.__ModuleLoader__.load({
 
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
+    /** 「显示 Git 输出」：最近执行过的命令，用于核对插件到底跑了什么。 */
+    function OutputDialog(props) {
+      const t = props.t
+      const at = (ms) => {
+        const date = new Date(ms)
+        const pad = (value) => (value < 10 ? '0' + String(value) : String(value))
+        return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
+      }
+      return E('div', {
+        className: 'gw-scrim',
+        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
+      },
+        E('div', { className: 'gw-card gw-card-wide' },
+          E('div', { className: 'gw-card-head' },
+            E('span', { className: 'gw-card-title' }, t('showOutput')),
+            E('button', { className: 'gw-card-close', onClick: props.onRefresh }, '⟳'),
+            E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
+          E('div', { className: 'gw-card-body' },
+            props.records.length === 0
+              ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
+              : E('div', { className: 'gw-output' }, props.records.map((item, index) => E('div', {
+                key: 'o' + String(index),
+                className: 'gw-output-row' + (item.failed === true ? ' gw-output-fail' : ''),
+              },
+                E('span', { className: 'gw-output-time' }, at(item.at)),
+                E('span', { className: 'gw-output-cmd' }, item.command),
+                E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms')))))))
+    }
+
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
     function SettingsDialog(props) {
       const t = props.t
@@ -1815,6 +1854,8 @@ window.__ModuleLoader__.load({
       const [ask, setAsk] = useState(null)
       const [treeView, setTreeView] = useState(false)
       const [settingsOpen, setSettingsOpen] = useState(false)
+      const [outputOpen, setOutputOpen] = useState(false)
+      const [outputList, setOutputList] = useState([])
       const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
@@ -2770,6 +2811,14 @@ window.__ModuleLoader__.load({
               })
             }),
             menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
+            menuRow(t('showOutput'), () => {
+              setMoreOpen(false)
+              setOutputOpen(true)
+              void run(async () => {
+                const data = await api('gitRecords', { limit: 200 })
+                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+              })
+            }),
             menuRow(t('openInTerminal'), () => {
               setMoreOpen(false)
               setAsk({
@@ -2779,6 +2828,17 @@ window.__ModuleLoader__.load({
                 onOk: () => {},
               })
             }))),
+        outputOpen === false ? null : E(OutputDialog, {
+          t: t,
+          records: outputList,
+          onClose: () => setOutputOpen(false),
+          onRefresh: () => {
+            void run(async () => {
+              const data = await api('gitRecords', { limit: 200 })
+              if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+            })
+          },
+        }),
         settingsOpen === false ? null : E(SettingsDialog, {
           t: t,
           prefs: prefs,
