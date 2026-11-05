@@ -116,7 +116,7 @@ window.__ModuleLoader__.load({
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
 .gw-card-wide { max-width:560px; }
-.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:0 12px 16px; }
+.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 14px 16px; }
 .gw-output { display:flex; flex-direction:column;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size:11.5px; line-height:1.65; }
