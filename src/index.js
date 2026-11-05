@@ -167,34 +167,38 @@ async function log(payload) {
     }
     throw error
   }
-  let entries = parseLog(raw)
+  const history = parseLog(raw)
+  const hasMore = history.length > limit
+  const page = hasMore ? history.slice(0, limit) : history
 
   /*
-   * stash 单独取一条，不放进上面那次遍历。
-   * 它不在 branches/tags/remotes 里，走 rev 列表会被顺着第二父带出 index 快照；
-   * 那些快照解析出来还得丢掉，丢的时候条数就少，分页判断跟着错。
-   * 只取 stash@{0} 这一个提交本身，父提交交给图去连，既不丢历史也不带杂质。
+   * stash 单独取一条插进首屏，不放进上面那次遍历。
+   * 它不在 branches/tags/remotes 里，挂在 rev 列表上会被顺着第二父带出
+   * index 快照；那些快照解析出来还得丢掉，丢的时候条数就少，分页跟着错。
+   * 只取 stash@{0} 这一个提交本身，父提交交给图去连。
+   * 只在 skip 为 0 时插：翻页时它已经在上面，每页都插会出现好几行。
    */
-  if (typeof payload.ref !== 'string' || payload.ref === '') {
+  if (skip === 0 && (typeof payload.ref !== 'string' || payload.ref === '')) {
     const stashHash = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
     if (stashHash !== null && stashHash.trim() !== '') {
       const stashRaw = await gitTextQuiet(cwd, [
         'log', '--no-walk=unsorted', '--decorate=full', '--format=' + LOG_FORMAT, stashHash.trim(),
       ])
       const stashEntry = stashRaw === null ? null : parseLog(stashRaw)[0]
-      if (stashEntry !== undefined && stashEntry !== null && entries.some((item) => item.hash === stashEntry.hash) === false) {
+      if (stashEntry !== undefined && stashEntry !== null && page.some((item) => item.hash === stashEntry.hash) === false) {
         // 按时间插回去，保证「新的在上、旧的在下」与父在子之后的次序不乱。
-        let at = entries.length
-        for (let i = 0; i < entries.length; i++) {
-          if (entries[i].time < stashEntry.time) { at = i; break }
+        let at = page.length
+        for (let i = 0; i < page.length; i++) {
+          if (page[i].time < stashEntry.time) { at = i; break }
         }
-        entries = entries.slice(0, at).concat([stashEntry]).concat(entries.slice(at))
+        page.splice(at, 0, stashEntry)
       }
     }
   }
 
-  const hasMore = entries.length > limit
-  return { entries: hasMore ? entries.slice(0, limit) : entries, hasMore }
+  /* consumed 是这一页从历史里取走的条数，不含插进来的 stash；
+     前端拿它当下一页的 skip，才不会因为多一行而错位。 */
+  return { entries: page, hasMore: hasMore, consumed: skip + (hasMore ? limit : history.length) }
 }
 
 async function branches(payload) {

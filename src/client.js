@@ -1551,6 +1551,7 @@ window.__ModuleLoader__.load({
       // 刷新会替换整个历史列表，先把用户正在看的那一行记下来，落库后再对回去
       const pendingAnchorRef = useRef(null)
       const entriesRef = useRef([])
+      const consumedRef = useRef(0)
       const offsetsRef = useRef({ list: [], total: 0 })
       useEffect(() => {
         aliveRef.current = true
@@ -1593,6 +1594,7 @@ window.__ModuleLoader__.load({
           const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
           pendingAnchorRef.current = anchor
+          consumedRef.current = typeof data.consumed === 'number' ? data.consumed : 0
           setEntries(Array.isArray(data.entries) ? data.entries : [])
           setHasMore(data.hasMore === true)
           setError(null)
@@ -1640,9 +1642,12 @@ window.__ModuleLoader__.load({
         if (loadingMore || !hasMore || cwd === '') return
         setLoadingMore(true)
         try {
-          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: entries.length })
+          /* 用后端回传的 consumed 当游标：它只数历史里取走的条数，
+             不含首屏额外插进来的 stash 行，翻页才不会错位或重复。 */
+          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: consumedRef.current })
           if (!aliveRef.current) return
           const next = Array.isArray(data.entries) ? data.entries : []
+          consumedRef.current = typeof data.consumed === 'number' ? data.consumed : consumedRef.current + next.length
           setEntries((prev) => prev.concat(next))
           setHasMore(data.hasMore === true)
         } catch (failure) {
