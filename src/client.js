@@ -274,11 +274,12 @@ window.__ModuleLoader__.load({
 .gw-diff-del { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent); }
 .gw-diff-hunk { color:var(--dsw-alias-label-tertiary); background:var(--dsw-alias-bg-layer-2); }
 .gw-diff-add .gw-diff-text, .gw-diff-del .gw-diff-text { color:var(--dsw-alias-label-primary); }
-.gw-tok-com { color:var(--dsw-alias-label-tertiary); font-style:italic; }
-.gw-tok-str { color:color-mix(in srgb, var(--dsw-alias-state-success-primary) 62%, var(--dsw-alias-label-primary)); }
-.gw-tok-num { color:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 58%, var(--dsw-alias-label-primary)); }
-.gw-tok-key { color:color-mix(in srgb, var(--dsw-alias-state-business-primary) 62%, var(--dsw-alias-label-primary)); }
-.gw-tok-fn { color:color-mix(in srgb, var(--dsw-alias-brand-primary) 62%, var(--dsw-alias-label-primary)); }
+/* 语法着色：每类各占一个色相，饱和度由主题语义色本身决定，混合比例只留一点点底色避免与正文完全脱开。 */
+.gw-tok-com { color:color-mix(in srgb, var(--dsw-alias-label-tertiary) 92%, var(--dsw-alias-state-success-primary)); font-style:italic; }
+.gw-tok-str { color:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 88%, var(--dsw-alias-label-primary)); }
+.gw-tok-num { color:color-mix(in srgb, var(--dsw-alias-state-success-primary) 85%, var(--dsw-alias-label-primary)); }
+.gw-tok-key { color:color-mix(in srgb, var(--dsw-alias-state-business-primary) 88%, var(--dsw-alias-label-primary)); }
+.gw-tok-fn { color:color-mix(in srgb, var(--dsw-alias-brand-primary) 85%, var(--dsw-alias-label-primary)); }
 
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
 /* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
