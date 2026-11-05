@@ -964,29 +964,41 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       // 三、分列。从父分支右边一格起往右找：这一列上一条分支已经在自己上方收尾，
       // 就说明两段线不会连在一起，可以复用；否则再往右让一格。
       const laneLast = [branches[trunkBranch].last]
-      const laneColor = [0]
       let laneCount = 1
+
+      /* 配色用颜色槽：每种颜色记着它上次用到哪一行，选色时找第一个与新区间
+         不重叠的槽。于是只在图上占行重叠的两条分支才必然不同色，隔得远但行
+         区间交叉的也不会撞。再排除父分支那一色与同一列上一条分支那一色。 */
+      const colourLast = []
+      const laneColour = []
+      const pickColour = (firstRow, lastRow, lane, fatherSlot) => {
+        const free = (from) => {
+          let slot = from
+          while (slot < colourLast.length && colourLast[slot] >= firstRow) slot += 1
+          return slot
+        }
+        const taken = (slot) => slot === fatherSlot || slot === laneColour[lane]
+        let slot = free(0)
+        while (taken(slot)) slot = free(slot + 1)
+        if (slot >= colourLast.length) colourLast.push(-1)
+        colourLast[slot] = lastRow
+        laneColour[lane] = slot
+        return slot
+      }
+
+      branches[trunkBranch].color = pickColour(branches[trunkBranch].tip, branches[trunkBranch].last, 0, -1)
+
       for (let index = 0; index < branches.length; index++) {
         if (index === trunkBranch) continue
         const branch = branches[index]
         const parent = branch.parent
         const base = parent >= 0 ? branches[parent].lane : 0
-        const parentColor = parent >= 0 ? branches[parent].color : -1
         let lane = base + 1
         while (laneLast[lane] !== undefined && laneLast[lane] >= branch.tip) lane += 1
         laneLast[lane] = branch.last
         branch.lane = lane
         if (lane + 1 > laneCount) laneCount = lane + 1
-
-        // 四、配色跟着分支走：避开父分支那一色，也避开同一列上一条分支那一色。
-        let color = index % LANE_COLORS.length
-        let guard = 0
-        while (guard < LANE_COLORS.length && (color === parentColor || color === laneColor[lane])) {
-          color = (color + 1) % LANE_COLORS.length
-          guard += 1
-        }
-        laneColor[lane] = color
-        branch.color = color
+        branch.color = pickColour(branch.tip, branch.last, lane, parent >= 0 ? branches[parent].color : -1)
       }
 
       const rowLane = new Array(entries.length).fill(0)
