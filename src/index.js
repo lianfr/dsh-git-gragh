@@ -153,16 +153,9 @@ async function log(payload) {
   const cwd = requireCwd(payload)
   const limit = boundedNumber(payload.limit, 100, 1, 500)
   const skip = boundedNumber(payload.skip, 0, 0, 100000)
-  // 多取一些：stash 的 index 快照会被下面过滤掉，只取 limit+1 会被过滤成恰好 limit 条，
-  // 于是 hasMore 变成 false，用户就永远翻不到最早的提交。
-  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1 + 32), '--skip', String(skip)]
+  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
   if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
-  else {
-    args.push('--branches', '--tags', '--remotes', 'HEAD')
-    // stash 单独挂进来：它不在 branches/tags/remotes 里，但图上要看得见
-    const stashRef = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
-    if (stashRef !== null && stashRef.trim() !== '') args.push('refs/stash')
-  }
+  else args.push('--branches', '--tags', '--remotes', 'HEAD')
 
   let raw = ''
   try {
@@ -175,8 +168,31 @@ async function log(payload) {
     throw error
   }
   let entries = parseLog(raw)
-  // stash 的第二父是它自己的 index 快照，画出来只会多一个没人认识的节点
-  entries = entries.filter((entry) => !/^index on /.test(entry.subject))
+
+  /*
+   * stash 单独取一条，不放进上面那次遍历。
+   * 它不在 branches/tags/remotes 里，走 rev 列表会被顺着第二父带出 index 快照；
+   * 那些快照解析出来还得丢掉，丢的时候条数就少，分页判断跟着错。
+   * 只取 stash@{0} 这一个提交本身，父提交交给图去连，既不丢历史也不带杂质。
+   */
+  if (typeof payload.ref !== 'string' || payload.ref === '') {
+    const stashHash = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
+    if (stashHash !== null && stashHash.trim() !== '') {
+      const stashRaw = await gitTextQuiet(cwd, [
+        'log', '--no-walk=unsorted', '--decorate=full', '--format=' + LOG_FORMAT, stashHash.trim(),
+      ])
+      const stashEntry = stashRaw === null ? null : parseLog(stashRaw)[0]
+      if (stashEntry !== undefined && stashEntry !== null && entries.some((item) => item.hash === stashEntry.hash) === false) {
+        // 按时间插回去，保证「新的在上、旧的在下」与父在子之后的次序不乱。
+        let at = entries.length
+        for (let i = 0; i < entries.length; i++) {
+          if (entries[i].time < stashEntry.time) { at = i; break }
+        }
+        entries = entries.slice(0, at).concat([stashEntry]).concat(entries.slice(at))
+      }
+    }
+  }
+
   const hasMore = entries.length > limit
   return { entries: hasMore ? entries.slice(0, limit) : entries, hasMore }
 }

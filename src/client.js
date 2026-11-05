@@ -770,18 +770,23 @@ window.__ModuleLoader__.load({
       branches[trunkBranch].lane = 0
 
       // 尖端按行号从上到下处理：上面的分支先占位，下面的只能往右让，所以分叉永远向右。
-      for (let i = 0; i < entries.length; i++) {
-        if (owner[i] >= 0) continue
-        let hasTip = false
-        for (const ref of refsOf(i)) {
+      // 真分支先认领，stash 与标签后认领——否则 stash 会顺着第一父一路往下，
+      // 把它所属分支的提交全吞进自己这条链里。
+      const tipRank = (row) => {
+        let rank = -1
+        for (const ref of refsOf(row)) {
           if (ref === null || ref === undefined) continue
           const type = ref.type
-          if (type === 'branch' || type === 'remote' || type === 'head' || type === 'stash' || type === 'tag') {
-            hasTip = true
-            break
-          }
+          if (type === 'branch' || type === 'remote' || type === 'head') return 0
+          if (type === 'stash' || type === 'tag') rank = 1
         }
-        if (hasTip) claim(i, -1)
+        return rank
+      }
+      for (const pass of [0, 1]) {
+        for (let i = 0; i < entries.length; i++) {
+          if (owner[i] >= 0) continue
+          if (tipRank(i) === pass) claim(i, -1)
+        }
       }
 
       // 二、还没归属的提交：跟着它的第一父；父也没有就并进主干。
