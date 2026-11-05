@@ -352,9 +352,7 @@ window.__ModuleLoader__.load({
   background:var(--dsw-alias-bg-layer-3);
   border:.5px solid var(--dsw-alias-border-l2);
   box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
-.gw-menu-icon { width:16px; height:16px; flex:none; color:var(--dsw-alias-label-secondary); }
-.gw-menu-item:hover .gw-menu-icon { color:var(--dsw-alias-label-primary); }
-.gw-menu-item { display:flex; align-items:center; gap:8px; padding:6px 8px; line-height:18px;
+.gw-menu-item { display:flex; align-items:center; padding:4px 7px; line-height:18px;
   border-radius:var(--dsw-radius-md, 12px);
   font-size:calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
@@ -1757,33 +1755,27 @@ window.__ModuleLoader__.load({
         props.onClose()
       }
 
-      const item = (label, run, tone, iconPaths) => E('div', {
+      const item = (label, run, tone) => E('div', {
         className: 'gw-menu-item' + (tone === undefined ? '' : ' gw-menu-' + tone),
         onClick: run,
-      },
-        E('span', { className: 'gw-menu-icon' },
-          iconPaths === undefined ? null : E('svg', {
-            width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none',
-            stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
-          }, iconPaths.map((d, index) => E('path', { key: 'p' + String(index), d: d })))),
-        E('span', { className: 'gw-menu-label' }, label))
+      }, label)
       const act = (kind) => () => { props.onClose(); props.onAction(kind, entry) }
 
       return E('div', { ref: ref, className: 'gw-menu gw-menu-ctx', style: { left: pos.left + 'px', top: pos.top + 'px' } },
-        item(t('addTag'), act('tag'), ['M3.4 8.3V3.4h4.9l4.3 4.3-4.9 4.9z', 'M5.9 5.9h.02']),
-        item(t('branchHere'), act('branch'), ['M5 3.2v9.6', 'M5 7.2h4.2a2.2 2.2 0 0 1 2.2 2.2v3.4', 'M9.4 11h3.2', 'M11 9.4v3.2']),
+        item(t('addTag'), act('tag')),
+        item(t('branchHere'), act('branch')),
         E('div', { className: 'gw-menu-sep' }),
-        item(t('checkoutHere'), act('checkout'), ['M5 3.2v9.6', 'M5 7h4.6a2.2 2.2 0 0 1 2.2 2.2v3.4', 'M9.6 3.4 11.8 5.2 9.6 7']),
-        item(t('cherryPickHere'), act('cherryPick'), ['M4 4v4.6h4.6', 'M4 8.6A4.6 4.6 0 1 0 8.6 4']),
-        item(t('revertHere'), act('revert'), ['M4.4 5.2H8.6a3.4 3.4 0 1 1 0 6.8H6.2', 'M6.2 3.2 4.2 5.2 6.2 7.2']),
-        item(t('dropHere'), act('drop'), 'danger', ['M4.2 5h7.6', 'M6.4 5V3.4h3.2V5', 'M5.4 5l.5 7.6h4.2L10.6 5']),
+        item(t('checkoutHere'), act('checkout')),
+        item(t('cherryPickHere'), act('cherryPick')),
+        item(t('revertHere'), act('revert')),
+        item(t('dropHere'), act('drop'), 'danger'),
         E('div', { className: 'gw-menu-sep' }),
-        item(t('mergeIntoCurrent'), act('merge'), ['M5 3.2v5.4a2.4 2.4 0 0 0 2.4 2.4h3.4', 'M5 8.2a2 2 0 1 1 0-.02']),
-        item(t('rebaseOntoHere'), act('rebase'), ['M5 3.2v6', 'M11 12.8v-6', 'M7.4 5.4h5.4', 'M10.4 3.4 12.6 5.4 10.4 7.4']),
-        item(t('resetToHere'), act('reset'), ['M4.2 5.2h7.6', 'M8 3.6v7.2', 'M6.2 9.4 8 11.4l1.8-2']),
+        item(t('mergeIntoCurrent'), act('merge')),
+        item(t('rebaseOntoHere'), act('rebase')),
+        item(t('resetToHere'), act('reset')),
         E('div', { className: 'gw-menu-sep' }),
-        item(t('copyHash'), () => copy(entry.hash), ['M6.4 6.4h6v6h-6z', 'M9.6 4.4H3.6v6']),
-        item(t('copySubject'), () => copy(entry.subject), undefined, ['M6.4 6.4h6v6h-6z', 'M9.6 4.4H3.6v6']))
+        item(t('copyHash'), () => copy(entry.hash)),
+        item(t('copySubject'), () => copy(entry.subject)))
     }
 
     /* ------------------------------------------------------------------ */
@@ -2436,18 +2428,16 @@ window.__ModuleLoader__.load({
       }, [cwd, run, refreshAll, t, onBranch, onCheckout])
 
       /** 菜单行：给了 action 就能点，给了 children 就在右侧展开下一级。 */
-      const menuRow = (label, action, iconPaths) => {
-        const paths = typeof iconPaths === 'string' ? [iconPaths] : (Array.isArray(iconPaths) ? iconPaths : [])
+      const menuRow = (label, action, children) => {
+        const kids = Array.isArray(children) ? children : []
+        const leaf = kids.length === 0
         return E('div', {
-          className: 'gw-menu-item' + (action === null ? ' gw-menu-off' : ''),
+          className: 'gw-menu-item' + (leaf ? '' : ' gw-menu-parent') + (leaf && action === null ? ' gw-menu-off' : ''),
           onClick: action === null ? undefined : action,
         },
-          E('span', { className: 'gw-menu-icon' },
-            paths.length === 0 ? null : E('svg', {
-              width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none',
-              stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
-            }, paths.map((d, index) => E('path', { key: 'p' + String(index), d: d })))),
-          E('span', { className: 'gw-menu-label' }, label))
+          E('span', { className: 'gw-menu-label' }, label),
+          leaf ? null : E('div', { className: 'gw-menu-sub' },
+            kids.map((kid, index) => E('div', { key: 's' + String(index), className: 'gw-menu-item' }, kid))))
       }
 
       if (cwd === '') {
@@ -2754,7 +2744,7 @@ window.__ModuleLoader__.load({
                 confirmLabel: t('checkoutTo'),
                 onOk: (values) => { if (values.text !== '') void run(async () => { await api('checkout', { cwd: cwd, target: values.text }); await refreshAll() }) },
               })
-            }, ['M5 3.2v9.6', 'M5 7h4.6a2.2 2.2 0 0 1 2.2 2.2v3.4', 'M9.6 3.4 11.8 5.2 9.6 7']),
+            }),
             menuRow(t('createBranchItem') + '…', () => {
               setMoreOpen(false)
               setAsk({
@@ -2767,7 +2757,7 @@ window.__ModuleLoader__.load({
                 confirmLabel: t('createBranch'),
                 onOk: (values) => { if (values.text !== '') void run(async () => { await api('createBranch', { cwd: cwd, name: values.text, checkout: values.checked }); await refreshAll() }) },
               })
-            }, ['M5 3.2v9.6', 'M5 7.2h4.2a2.2 2.2 0 0 1 2.2 2.2v3.4', 'M9.4 11h3.2', 'M11 9.4v3.2']),
+            }),
             menuRow(t('tagCreateItem') + '…', () => {
               setMoreOpen(false)
               setAsk({
@@ -2778,8 +2768,8 @@ window.__ModuleLoader__.load({
                 confirmLabel: t('createTag'),
                 onOk: (values) => { if (values.text !== '') void run(async () => { await api('tagCreate', { cwd: cwd, name: values.text, hash: headHash === null ? 'HEAD' : headHash }); await refreshAll() }) },
               })
-            }, ['M3.4 8.3V3.4h4.9l4.3 4.3-4.9 4.9z', 'M5.9 5.9h.02']),
-            menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }, ['M5.5 12.5a3 3 0 0 1 .3-6 3.8 3.8 0 0 1 7.2 .8 2.6 2.6 0 0 1-.5 5.2H5.5z']),
+            }),
+            menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
             menuRow(t('openInTerminal'), () => {
               setMoreOpen(false)
               setAsk({
@@ -3038,7 +3028,7 @@ window.__ModuleLoader__.load({
               ctx: tabProps.ctx,
               scope: tabProps.scope,
               tab: tabProps.tab,
-            }, ['M4.2 4.8 7.4 8l-3.2 3.2', 'M9.2 11.2h3']),
+            }),
           })
           return () => {
             if (typeof off === 'function') off()
