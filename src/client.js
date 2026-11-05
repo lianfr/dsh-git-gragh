@@ -2761,7 +2761,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         }),
         iconButton({
           title: t('settings'),
-          onClick: openPluginSettings,
+          /* 小齿轮开面板内的设置；宿主那个插件详情页从设置里的按钮进。 */
+          onClick: () => setSettingsOpen(true),
           path: 'M6.58 3.31L6.87 1.70L9.13 1.70L9.42 3.31L11.35 4.43L12.89 3.87L14.02 5.83'
             + 'L12.77 6.88L12.77 9.12L14.02 10.17L12.89 12.13L11.35 11.57L9.42 12.69L9.13 14.30'
             + 'L6.87 14.30L6.58 12.69L4.65 11.57L3.11 12.13L1.98 10.17L3.23 9.12L3.23 6.88'
