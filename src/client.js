@@ -116,20 +116,21 @@ window.__ModuleLoader__.load({
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
 .gw-card-wide { max-width:560px; }
-.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:6px 14px 16px; }
-.gw-output { display:flex; flex-direction:column; gap:2px;
+.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:0 12px 16px; }
+.gw-output { display:flex; flex-direction:column;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size:11.5px; line-height:1.6; }
-.gw-output-row { display:flex; align-items:baseline; gap:12px; padding:5px 8px;
-  border-radius:var(--dsw-radius-sm, 8px); color:var(--dsw-alias-label-secondary); }
-.gw-output-row:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
-.gw-output-time { flex:none; width:62px; color:var(--dsw-alias-label-tertiary);
+  font-size:11.5px; line-height:1.65; }
+/* 每条占一段而不是一行：命令完整换行显示，不省略，便于逐条核对。 */
+.gw-output-item { display:flex; align-items:flex-start; gap:12px; padding:8px 2px;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-output-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
+.gw-output-meta { flex:none; width:64px; color:var(--dsw-alias-label-tertiary);
   font-variant-numeric:tabular-nums; }
-.gw-output-cmd { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
-  white-space:nowrap; }
-.gw-output-ms { flex:none; width:62px; text-align:right; color:var(--dsw-alias-label-tertiary);
-  font-variant-numeric:tabular-nums; }
+.gw-output-body { flex:1 1 auto; min-width:0; }
+.gw-output-cmd { white-space:pre-wrap; word-break:break-all; color:var(--dsw-alias-label-primary); }
+.gw-output-note { color:var(--dsw-alias-label-tertiary); }
 .gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
+.gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
@@ -1291,11 +1292,17 @@ window.__ModuleLoader__.load({
           ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
           : E('div', { className: 'gw-output-scroll' }, E('div', { className: 'gw-output' }, props.records.map((item, index) => E('div', {
             key: 'o' + String(index),
-            className: 'gw-output-row' + (item.failed === true ? ' gw-output-fail' : ''),
+            className: 'gw-output-item' + (item.failed === true ? ' gw-output-fail' : ''),
           },
-            E('span', { className: 'gw-output-time' }, at(item.at)),
-            E('span', { className: 'gw-output-cmd' }, item.command),
-            E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms'))))))
+            E('div', { className: 'gw-output-meta' },
+              E('div', { className: 'gw-output-time' }, at(item.at)),
+              E('div', { className: 'gw-output-ms' }, String(item.ms) + ' ms')),
+            E('div', { className: 'gw-output-body' },
+              E('div', { className: 'gw-output-cmd' }, item.command),
+              E('div', { className: 'gw-output-note' },
+                item.failed === true
+                  ? item.message
+                  : 'exit ' + String(item.code) + ' · ' + String(item.stdoutBytes) + ' B')))))))
     }
 
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
