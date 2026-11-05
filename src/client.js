@@ -435,7 +435,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   border:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent);
   box-shadow:0 6px 18px rgba(0,0,0,.16); pointer-events:auto;
   display:flex; align-items:center; gap:8px;
-  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 3.1s forwards; }
+  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both; }
 .gw-err-text { flex:1 1 auto; min-width:0; }
 .gw-err-close { flex:none; display:flex; align-items:center; justify-content:center;
   width:16px; height:16px; padding:0; border:none; border-radius:50%; background:transparent;
@@ -446,8 +446,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   from { opacity:0; transform:translateY(-6px) scale(.985); }
   to { opacity:1; transform:none; }
 }
-@keyframes gw-err-out {
-  from { opacity:1; transform:none; }
   to { opacity:0; transform:translateY(-4px) scale(.99); }
 }
 /* 浮层尺寸照宿主的菜单与对话框来：菜单四像素内距、项四乘七、圆角用中号；
@@ -2139,7 +2137,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const [error, setError] = useState(null)
       const errorSeq = useRef(0)
-      const errorTimer = useRef(null)
       const [busy, setBusy] = useState(false)
       const [message, setMessage] = useState('')
       const [amend, setAmend] = useState(false)
@@ -2203,29 +2200,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         return () => { aliveRef.current = false }
       }, [])
 
-      /* 错误只留一条：新错误直接顶掉旧的，并且统一由这里管计时退场，
-         免得轮询每几秒重设一次、把计时器一直往后推，看起来就永远不消失。 */
+      /* 错误只留一条：新错误顶掉旧的，不叠也不排队。停留多久由用户决定，
+         只有点右上角的叉才关。 */
       const showError = useCallback((text) => {
         errorSeq.current += 1
         setError({ id: errorSeq.current, text: text })
-        if (errorTimer.current !== null) clearTimeout(errorTimer.current)
-        errorTimer.current = setTimeout(() => {
-          errorTimer.current = null
-          if (aliveRef.current) clearError()
-        }, 3600)
       }, [])
 
-      const clearError = useCallback(() => {
-        if (errorTimer.current !== null) {
-          clearTimeout(errorTimer.current)
-          errorTimer.current = null
-        }
-        setError(null)
-      }, [])
-
-      useEffect(() => () => {
-        if (errorTimer.current !== null) clearTimeout(errorTimer.current)
-      }, [])
+      const clearError = useCallback(() => { setError(null) }, [])
 
       const refreshSummary = useCallback(async (quiet) => {
         if (cwd === '') return null
@@ -2524,12 +2506,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
       }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore, openGroupDiff])
 
-      /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
-      useEffect(() => {
-        if (error === null) return undefined
-        const timer = setTimeout(() => { if (aliveRef.current) clearError() }, 4100)
-        return () => clearTimeout(timer)
-      }, [error])
 
       const loadRemotes = useCallback(async () => {
         try {
