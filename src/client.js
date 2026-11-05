@@ -1142,7 +1142,7 @@ window.__ModuleLoader__.load({
           parts.name),
 
         E('span', { className: 'gw-file-actions' },
-          E(ActionIcon, { name: 'open', title: t('openFile'), onClick: () => props.onOpen(item) }),
+          E(ActionIcon, { name: 'open', title: t('openFile'), onClick: () => props.onOpenEditor(item) }),
           props.group === 'staged'
             ? E(ActionIcon, { name: 'unstage', title: t('unstage'), onClick: () => props.onUnstage(item) })
             : null,
@@ -1201,6 +1201,7 @@ window.__ModuleLoader__.load({
           t: props.t,
           style: { paddingLeft: '8px' },
           onOpen: props.onOpen,
+          onOpenEditor: props.onOpenEditor,
           onStage: props.onStage,
           onUnstage: props.onUnstage,
           onDiscard: props.onDiscard,
@@ -1230,6 +1231,7 @@ window.__ModuleLoader__.load({
                 collapsed: props.collapsed,
                 onToggleDir: props.onToggleDir,
                 onOpen: props.onOpen,
+                onOpenEditor: props.onOpenEditor,
                 onStage: props.onStage,
                 onUnstage: props.onUnstage,
                 onDiscard: props.onDiscard,
@@ -1257,6 +1259,7 @@ window.__ModuleLoader__.load({
               collapsed: props.collapsed,
               onToggleDir: props.onToggleDir,
               onOpen: props.onOpen,
+              onOpenEditor: props.onOpenEditor,
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
@@ -1267,6 +1270,7 @@ window.__ModuleLoader__.load({
               group: props.group,
               t: t,
               onOpen: props.onOpen,
+              onOpenEditor: props.onOpenEditor,
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
@@ -1695,6 +1699,21 @@ window.__ModuleLoader__.load({
           if (aliveRef.current) setDiffView({ title: item.path, text: String(failure.message), loading: false })
         }
       }, [cwd])
+
+      /* 「打开文件」交给侧边栏自带的编辑器，开成新标签页，不占用下半区的图区。 */
+      const openInEditor = useCallback((item) => {
+        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
+        if (service === undefined || service === null || typeof service.openFile !== 'function') {
+          void openWorkDiff(item)
+          return
+        }
+        try {
+          service.openFile(scope, item.path)
+        } catch (failure) {
+          void failure
+          void openWorkDiff(item)
+        }
+      }, [ctx, scope, openWorkDiff])
 
       const openCommitDiff = useCallback(async (file) => {
         setDiffView({ title: file.path, text: '', loading: true })
@@ -2233,28 +2252,28 @@ window.__ModuleLoader__.load({
                     action: groupActions('unstaged', unstaged),
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('changes'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
                   }),
                   E(ChangeGroup, {
                     group: 'untracked', title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
                     action: groupActions('untracked', untracked),
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('untracked'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
                   }),
                   E(ChangeGroup, {
                     group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
                     action: groupActions('staged', staged),
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('staged'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
                   }),
                   E(ChangeGroup, {
                     group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
                     action: null,
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('conflicts'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
                   }))))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
