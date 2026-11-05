@@ -86,7 +86,10 @@ window.__ModuleLoader__.load({
 .gw-files-tab { display:flex; flex-direction:column; height:100%; min-height:0; overflow:auto; }
 .gw-files-tab-bar { display:flex; align-items:center; gap:6px; padding:4px 8px 4px 10px;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
-.gw-files-tab-title { font-size:11px; color:var(--dsw-alias-label-tertiary); }
+.gw-files-tab-title { display:inline-flex; align-items:center; gap:4px;
+  font-size:11px; color:var(--dsw-alias-label-tertiary); }
+.gw-files-tab-add { color:var(--dsw-alias-state-success-primary); }
+.gw-files-tab-del { color:var(--dsw-alias-state-error-primary); }
 .gw-files-tab-head { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
 .gw-files-tab-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
@@ -253,6 +256,10 @@ window.__ModuleLoader__.load({
 .gw-diff-body { flex:1 1 auto; min-height:0; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   font-size:11px; line-height:1.5; }
 .gw-diff-line { display:flex; white-space:pre; }
+.gw-diff-sign { flex:none; width:12px; text-align:center; user-select:none;
+  color:var(--dsw-alias-label-tertiary); }
+.gw-diff-add .gw-diff-sign { color:var(--dsw-alias-state-success-primary); }
+.gw-diff-del .gw-diff-sign { color:var(--dsw-alias-state-error-primary); }
 .gw-diff-gutter { flex:none; width:40px; text-align:right; padding-right:8px; user-select:none;
   color:var(--dsw-alias-label-tertiary); }
 .gw-diff-text { flex:1 1 auto; padding-right:12px; }
@@ -943,30 +950,30 @@ window.__ModuleLoader__.load({
       let newNo = 0
       let inHunk = false
       for (const line of lines) {
+        /* 文件头那一堆（diff --git、index、---、+++、mode 之类）在单文件视图里
+           是重复信息，文件路径已经在标签页标题上了，全部丢掉。 */
         if (line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('--- ') ||
             line.startsWith('+++ ') || line.startsWith('new file') || line.startsWith('deleted file') ||
             line.startsWith('old mode') || line.startsWith('new mode') || line.startsWith('similarity') ||
             line.startsWith('rename ') || line.startsWith('Binary files')) {
-          if (line.startsWith('--- ')) continue
-          if (line.startsWith('+++ ')) continue
-          if (line.startsWith('diff --git')) rows.push({ type: 'meta', text: line })
           continue
         }
+        /* 分节标记只用来对齐行号，本身不显示。 */
         if (line.startsWith('@@')) {
           const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line)
           if (match !== null) { oldNo = Number(match[1]); newNo = Number(match[2]) }
           inHunk = true
-          rows.push({ type: 'hunk', text: line })
           continue
         }
         if (!inHunk) {
-          if (line !== '') rows.push({ type: 'meta', text: line })
+          if (line !== '') rows.push({ type: 'meta', sign: '', text: line })
           continue
         }
-        if (line.startsWith('+')) { rows.push({ type: 'add', text: line, no: String(newNo) }); newNo += 1; continue }
-        if (line.startsWith('-')) { rows.push({ type: 'del', text: line, no: String(oldNo) }); oldNo += 1; continue }
-        if (line.startsWith('\\')) { rows.push({ type: 'meta', text: line }); continue }
-        rows.push({ type: 'ctx', text: line, no: String(newNo) })
+        /* 增删符号单独成列，正文从第二个字符开始，不再挤在内容里。 */
+        if (line.startsWith('+')) { rows.push({ type: 'add', sign: '+', text: line.slice(1), no: String(newNo) }); newNo += 1; continue }
+        if (line.startsWith('-')) { rows.push({ type: 'del', sign: '−', text: line.slice(1), no: String(oldNo) }); oldNo += 1; continue }
+        if (line.startsWith('\\')) { rows.push({ type: 'meta', sign: '', text: line }); continue }
+        rows.push({ type: 'ctx', sign: '', text: line.slice(1), no: String(newNo) })
         oldNo += 1
         newNo += 1
       }
@@ -1345,6 +1352,7 @@ window.__ModuleLoader__.load({
               : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
         },
           E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
+          E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
           E('span', { className: 'gw-diff-text' }, row.text))))
     }
 
@@ -1367,6 +1375,7 @@ window.__ModuleLoader__.load({
                       : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
                 },
                   E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
+                  E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
                   E('span', { className: 'gw-diff-text' }, row.text)))))
     }
 
@@ -2610,7 +2619,15 @@ window.__ModuleLoader__.load({
       }, [cwd, staged, hash, token])
 
       const head = E('div', { className: 'gw-files-tab-bar' },
-        E('span', { className: 'gw-files-tab-title' }, String(paths.length) + ' ' + t('filesUnit')),
+        E('span', { className: 'gw-files-tab-title' },
+          E('svg', {
+            width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none',
+            stroke: 'currentColor', strokeWidth: 1.3,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          },
+            E('path', { d: 'M9.6 1.8H4.6a1.1 1.1 0 0 0-1.1 1.1v10.2a1.1 1.1 0 0 0 1.1 1.1h6.8a1.1 1.1 0 0 0 1.1-1.1V4.6z' }),
+            E('path', { d: 'M9.4 1.9v2.8h2.8' })),
+          String(paths.length) + ' ' + t('filesUnit')),
         E('span', { className: 'gw-spacer' }),
         E('button', {
           className: 'gw-icon',
@@ -2641,7 +2658,12 @@ window.__ModuleLoader__.load({
               E('span', { className: 'gw-files-tab-path' }, item.path),
               E('span', { className: 'gw-spacer' }),
               E('span', { className: 'gw-files-tab-count' },
-                item.failed === true ? t('diffLoadError') : '+' + String(added) + ' −' + String(removed))),
+                item.failed === true
+                  ? t('diffLoadError')
+                  : E('span', null,
+                      E('span', { className: 'gw-files-tab-add' }, '+' + String(added)),
+                      ' ',
+                      E('span', { className: 'gw-files-tab-del' }, '−' + String(removed))))),
             openNow === false ? null : E(DiffBody, { text: item.text }))
         }))
     }
