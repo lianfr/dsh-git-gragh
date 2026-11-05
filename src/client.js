@@ -10,6 +10,34 @@ window.__ModuleLoader__.load({
     const PAGE_SIZE = 100
     const UNCOMMITTED_HASH = '@uncommitted'
   const POLL_MS = 3000
+
+  /* 面板偏好按仓库路径分开存：同一个人在不同仓库上可能想要不同的刷新频率。 */
+  const PREFS_POLL = [0, 3000, 10000]
+  const PREFS_PAGE = [50, 100, 200]
+
+  function loadPrefs(key) {
+    const fallback = { poll: 3000, page: 100 }
+    try {
+      const raw = globalThis.localStorage === undefined ? null : globalThis.localStorage.getItem('gw-prefs:' + key)
+      if (raw === null) return fallback
+      const parsed = JSON.parse(raw)
+      return {
+        poll: PREFS_POLL.indexOf(parsed.poll) >= 0 ? parsed.poll : fallback.poll,
+        page: PREFS_PAGE.indexOf(parsed.page) >= 0 ? parsed.page : fallback.page,
+      }
+    } catch (error) {
+      void error
+      return fallback
+    }
+  }
+
+  function savePrefs(key, value) {
+    try {
+      if (globalThis.localStorage !== undefined) globalThis.localStorage.setItem('gw-prefs:' + key, JSON.stringify(value))
+    } catch (error) {
+      void error
+    }
+  }
     const ROW_H = 24
     const LANE_W = 14
     const DRAWER_H = 300
@@ -87,6 +115,14 @@ window.__ModuleLoader__.load({
 .gw-caret { width:12px; flex:none; color:var(--dsw-alias-label-tertiary); opacity:.9;
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
+.gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
+.gw-set-opts { display:flex; gap:4px; }
+.gw-set-opt { padding:3px 9px; font-size:11px; border-radius:6px; cursor:pointer;
+  border:1px solid var(--dsw-alias-border-l2); background:transparent;
+  color:var(--dsw-alias-label-secondary); }
+.gw-set-opt:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
+.gw-set-opt-on { border-color:var(--dsw-alias-brand-primary); color:var(--dsw-alias-brand-primary); }
 .gw-files-tab { display:flex; flex-direction:column; height:100%; min-height:0; overflow:auto; }
 .gw-files-tab-bar { display:flex; align-items:center; gap:6px; padding:4px 8px 4px 10px;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
@@ -402,6 +438,9 @@ window.__ModuleLoader__.load({
         treeView: '以树形式查看',
         flatView: '以列表形式查看',
         settings: '设置',
+        pollLabel: '自动刷新',
+        pageLabel: '每页条数',
+        off: '关闭',
         clone: '克隆…',
         cloneUrl: '从远程地址克隆',
         cloneTo: '克隆到当前工作区',
@@ -541,6 +580,9 @@ window.__ModuleLoader__.load({
         treeView: 'View as tree',
         flatView: 'View as list',
         settings: 'Settings',
+        pollLabel: 'Auto refresh',
+        pageLabel: 'Rows per page',
+        off: 'Off',
         clone: 'Clone…',
         cloneUrl: 'Clone from URL',
         cloneTo: 'Clone into workspace',
@@ -1196,6 +1238,37 @@ window.__ModuleLoader__.load({
 
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
+    /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
+    function SettingsDialog(props) {
+      const t = props.t
+      const [poll, setPoll] = useState(props.prefs.poll)
+      const [page, setPage] = useState(props.prefs.page)
+      const row = (label, values, current, onPick, format) => E('div', { className: 'gw-set-row' },
+        E('span', { className: 'gw-set-label' }, label),
+        E('div', { className: 'gw-set-opts' }, values.map((value) => E('button', {
+          key: String(value),
+          className: 'gw-set-opt' + (value === current ? ' gw-set-opt-on' : ''),
+          onClick: () => onPick(value),
+        }, format(value)))))
+      return E('div', {
+        className: 'gw-scrim',
+        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
+      },
+        E('div', { className: 'gw-card' },
+          E('div', { className: 'gw-card-head' },
+            E('span', { className: 'gw-card-title' }, t('settings')),
+            E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
+          E('div', { className: 'gw-card-body' },
+            row(t('pollLabel'), PREFS_POLL, poll, setPoll, (value) => value === 0 ? t('off') : String(value / 1000) + 's'),
+            row(t('pageLabel'), PREFS_PAGE, page, setPage, (value) => String(value))),
+          E('div', { className: 'gw-card-foot' },
+            E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, t('cancel')),
+            E('button', {
+              className: 'gw-btn gw-btn-primary gw-btn-sm',
+              onClick: () => props.onSave({ poll: poll, page: page }),
+            }, t('save')))))
+    }
+
     function RemoteDialog(props) {
       const t = props.t
       const list = Array.isArray(props.list) ? props.list : []
@@ -1721,6 +1794,7 @@ window.__ModuleLoader__.load({
       const [focus, setFocus] = useState(false)
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
+      const [prefs, setPrefs] = useState(() => loadPrefs(cwd))
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
@@ -1777,7 +1851,7 @@ window.__ModuleLoader__.load({
         if (cwd === '') return
         try {
           // 已经往下翻过的部分要一起取回来，否则刷新会把列表截回第一页
-          const limit = Math.max(PAGE_SIZE, entriesRef.current.length)
+          const limit = Math.max(prefs.page, entriesRef.current.length)
           const anchor = captureAnchor()
           const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
@@ -1822,7 +1896,7 @@ window.__ModuleLoader__.load({
           if (signature === lastSigRef.current) return
           lastSigRef.current = signature
           await refreshLog()
-        }, POLL_MS)
+        }, prefs.poll)
         return () => { stopped = true; clearInterval(timer) }
       }, [cwd, props.visible, refreshSummary, refreshLog])
 
@@ -1832,7 +1906,7 @@ window.__ModuleLoader__.load({
         try {
           /* 用后端回传的 consumed 当游标：它只数历史里取走的条数，
              不含首屏额外插进来的 stash 行，翻页才不会错位或重复。 */
-          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: consumedRef.current })
+          const data = await api('log', { cwd: cwd, limit: prefs.page, skip: consumedRef.current })
           if (!aliveRef.current) return
           const next = Array.isArray(data.entries) ? data.entries : []
           consumedRef.current = typeof data.consumed === 'number' ? data.consumed : consumedRef.current + next.length
@@ -2691,6 +2765,16 @@ window.__ModuleLoader__.load({
                 onOk: () => {},
               })
             }))),
+        settingsOpen === false ? null : E(SettingsDialog, {
+          t: t,
+          prefs: prefs,
+          onClose: () => setSettingsOpen(false),
+          onSave: (next) => {
+            setPrefs(next)
+            savePrefs(cwd, next)
+            setSettingsOpen(false)
+          },
+        }),
         ask === null ? null : E(AskDialog, {
           t: t,
           title: ask.title,
