@@ -126,9 +126,58 @@ function boundedNumber(value, fallback, min, max) {
 
 /* ============================== 读方法 ============================== */
 
+/* numstat 每行是「增\t删\t路径」，二进制记成 -。
+   把工作区与暂存区两份合起来，就是这个文件相对 HEAD 的总增删。 */
+async function numstatMap(cwd, args) {
+  const raw = await gitTextQuiet(cwd, args)
+  const map = new Map()
+  if (raw === null) return map
+  for (const line of raw.split('\n')) {
+    if (line === '') continue
+    const parts = line.split('\t')
+    if (parts.length < 3) continue
+    const added = parts[0] === '-' ? 0 : Number(parts[0])
+    const deleted = parts[1] === '-' ? 0 : Number(parts[1])
+    map.set(parts[2], {
+      added: Number.isFinite(added) ? added : 0,
+      deleted: Number.isFinite(deleted) ? deleted : 0,
+    })
+  }
+  return map
+}
+
+/* 未跟踪的文件不在 diff 里，行数只能自己数。超过 2MB 的不数，免得卡住面板。 */
+function countUntracked(cwd, rel) {
+  try {
+    const full = path.join(cwd, rel)
+    const info = statSync(full)
+    if (info.isFile() === false || info.size > 2 * 1024 * 1024) return { added: 0, deleted: 0 }
+    const text = readFileSync(full, 'utf8')
+    if (text.indexOf('\u0000') >= 0) return { added: 0, deleted: 0 }
+    const lines = text.split('\n')
+    const total = lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    return { added: total, deleted: 0 }
+  } catch (error) {
+    void error
+    return { added: 0, deleted: 0 }
+  }
+}
+
 async function readChanges(cwd) {
   const raw = await gitText(cwd, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
-  return parseStatus(raw)
+  const items = parseStatus(raw)
+  if (items.length === 0) return items
+  const working = await numstatMap(cwd, ['diff', '--numstat'])
+  const staged = await numstatMap(cwd, ['diff', '--cached', '--numstat'])
+  return items.map((item) => {
+    if (item.untracked === true) {
+      const total = countUntracked(cwd, item.path)
+      return Object.assign({}, item, { added: total.added, deleted: total.deleted })
+    }
+    const a = working.get(item.path) === undefined ? { added: 0, deleted: 0 } : working.get(item.path)
+    const b = staged.get(item.path) === undefined ? { added: 0, deleted: 0 } : staged.get(item.path)
+    return Object.assign({}, item, { added: a.added + b.added, deleted: a.deleted + b.deleted })
+  })
 }
 
 async function summary(payload) {
