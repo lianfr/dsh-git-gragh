@@ -1768,12 +1768,12 @@ window.__ModuleLoader__.load({
         }
         if (group === 'unstaged') {
           return E('span', { style: { display: 'flex', gap: '1px' } },
-            E(ActionIcon, { name: 'discard', title: t('discardAll'), onClick: () => doDiscardAll(items) }),
+            E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
             E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
         }
         return E('span', { style: { display: 'flex', gap: '1px' } },
           E(ActionIcon, { name: 'ignore', title: t('ignoreAll'), onClick: () => doIgnore(paths) }),
-          E(ActionIcon, { name: 'discard', title: t('discardAll'), onClick: () => doDiscardAll(items) }),
+          E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
           E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
       }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore])
 
