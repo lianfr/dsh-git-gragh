@@ -3537,17 +3537,17 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       ctx.inject(['slots'], (slotCtx) => {
         slotCtx.effect(() => {
           const t = translatorOf(slotCtx)
-          const offIcon = slotCtx.slots.register({
+          const offIcon = slotCtx.slots.inject('sidebar.panellist', () => slotCtx.slots.register({
             name: 'sidebar.panellist',
             id: 'git-graph',
             order: 60,
             label: () => t('title'),
-          }, (iconProps) => E(TabIcon, { size: iconProps.size }))
-          const offPanel = slotCtx.slots.register({
+          }, (iconProps) => E(TabIcon, { size: iconProps.size })))
+          const offPanel = slotCtx.slots.inject('main', () => slotCtx.slots.register({
             name: 'main',
             key: 'git-graph',
             inject: () => ({ ctx: slotCtx }),
-          }, NativePanel)
+          }, NativePanel))
           return () => {
             if (typeof offIcon === 'function') offIcon()
             if (typeof offPanel === 'function') offPanel()
