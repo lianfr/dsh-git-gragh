@@ -153,7 +153,9 @@ async function log(payload) {
   const cwd = requireCwd(payload)
   const limit = boundedNumber(payload.limit, 100, 1, 500)
   const skip = boundedNumber(payload.skip, 0, 0, 100000)
-  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
+  // 多取一些：stash 的 index 快照会被下面过滤掉，只取 limit+1 会被过滤成恰好 limit 条，
+  // 于是 hasMore 变成 false，用户就永远翻不到最早的提交。
+  const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1 + 32), '--skip', String(skip)]
   if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
   else {
     args.push('--branches', '--tags', '--remotes', 'HEAD')
