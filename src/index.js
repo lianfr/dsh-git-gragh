@@ -13,57 +13,12 @@
  */
 
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 import { GitError, gitExecutable, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
 
 export const name = 'dsh-git-workbench'
 export const inject = ['webServer']
-
-/* 插件的行内配置。宿主的插件详情页会把这里的每个字段渲染成一个设置项，
-   改完直接写回 Loader 的 Config，插件重启时生效。
-
-   schemastery 必须走 ESM 入口（`import`）而不是 `require`：这个包有双入口，
-   `lib/index.mjs` 与 `lib/index.cjs` 是两个模块实例，宿主拿自己那份的构造函数
-   身份来认 schema，跨入口拿到的对象在它眼里不认识，行配置就会被判成 absent、
-   设置表单不出现。本包以 link: 装进 profile，真实路径在 profile 之外，所以
-   裸解析失败时再从 DSH_PROFILE_DIR 那一份按文件 URL 拿同样的 ESM 入口。 */
-let Schema = null
-try {
-  Schema = (await import('@deepseek-ai/schemastery')).default
-} catch (first) {
-  try {
-    const profileDir = process.env.DSH_PROFILE_DIR
-    if (typeof profileDir === 'string' && profileDir !== '') {
-      const target = path.join(profileDir, 'node_modules/@deepseek-ai/schemastery/lib/index.mjs')
-      Schema = (await import(pathToFileURL(target).href)).default
-    }
-  } catch (second) {
-    void second
-  }
-}
-
-/** 设置项在 dsh >= 0.1.7 用 volatile 引用，老宿主上就是普通值。 */
-function live(schema) {
-  return typeof schema.volatile === 'function' ? schema.volatile() : schema
-}
-
-export const Config = Schema === null ? undefined : Schema.object({
-  pageSize: live(Schema.number().default(100).min(20).max(500))
-    .description('提交图每页拉取多少条。数值越大首屏越慢，往下翻的次数越少。'),
-  pollMs: live(Schema.number().default(3000).min(0).max(60000))
-    .description('面板在后台检查仓库变化的间隔，单位毫秒。设为 0 关掉自动刷新。'),
-  showUncommitted: live(Schema.boolean().default(true))
-    .description('工作区有改动时，在提交图最上面单独画一行「未提交的更改」。'),
-  confirmDiscard: live(Schema.boolean().default(true))
-    .description('丢弃更改、重置这类不可撤销的操作，执行前先弹确认。'),
-})
-
-/* apply 收到的行内配置。写进这里，settings 方法再原样吐给客户端，
-   于是面板与插件详情页读的是同一份值，不用两边各存一套。 */
-let currentConfig = {}
 
 const ROUTE_PREFIX = '/dsh-git-workbench/api'
 const LOG_FORMAT = ['%H', '%h', '%P', '%an', '%ae', '%at', '%D', '%s'].join(LOG_FIELD) + LOG_RECORD
@@ -243,14 +198,6 @@ async function log(payload) {
   return { entries: page, hasMore: hasMore, consumed: skip + (hasMore ? limit : history.length) }
 }
 
-function settings() {
-  return {
-    pageSize: typeof currentConfig.pageSize === 'number' ? currentConfig.pageSize : 100,
-    pollMs: typeof currentConfig.pollMs === 'number' ? currentConfig.pollMs : 3000,
-    showUncommitted: currentConfig.showUncommitted !== false,
-    confirmDiscard: currentConfig.confirmDiscard !== false,
-  }
-}
 
 async function branches(payload) {
   const cwd = requireCwd(payload)
@@ -636,7 +583,7 @@ function gitRecords(payload) {
   return { records: recentGit(limit), executable: gitExecutable() }
 }
 
-const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes, gitRecords, settings }
+const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes, gitRecords }
 const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit, ignore }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 
@@ -745,7 +692,6 @@ async function handle(req, res) {
 }
 
 export function apply(ctx, config) {
-  currentConfig = config === undefined || config === null ? {} : config
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: handle }),
     'dsh-git-workbench: /dsh-git-workbench/api git 路由',

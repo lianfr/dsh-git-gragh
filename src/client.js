@@ -164,20 +164,26 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
 /* 设置面板：一行一项，名字与说明在左，控件在右，行间一条细线。 */
 .gw-set-list { display:flex; flex-direction:column; }
-.gw-set-item { display:flex; align-items:center; gap:16px; padding:11px 0;
+.gw-set-item { display:flex; align-items:center; gap:20px; padding:16px 0;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
 .gw-set-item:last-child { border-bottom:none; }
-.gw-set-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
-.gw-set-name { font-size:13px; color:var(--dsw-alias-label-primary); }
-.gw-set-desc { font-size:12px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
-.gw-switch { position:relative; flex:none; width:34px; height:20px; padding:0; border:none;
-  border-radius:10px; cursor:pointer; transition:background .15s ease;
+.gw-set-text { display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 auto; }
+.gw-set-name { font-size:15px; line-height:1.35; color:var(--dsw-alias-label-primary); }
+.gw-set-desc { font-size:13px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
+/* 设置面板里的下拉是浅灰圆角块，跟宿主设置页的右侧控件同形 */
+.gw-set-item .gw-dd-btn { height:36px; min-width:132px; padding:0 12px; border:none;
+  border-radius:10px; font-size:13px;
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.gw-set-item .gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent); }
+/* 开关：整颗胶囊，开启态是实心深色轨道 + 白点 */
+.gw-switch { position:relative; flex:none; width:52px; height:30px; padding:0; border:none;
+  border-radius:15px; cursor:pointer; transition:background .16s ease;
   background:var(--dsw-alias-interactive-bg-active);
-  background:color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent); }
-.gw-switch-on { background:var(--dsw-alias-brand-primary); }
-.gw-switch-knob { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:8px;
-  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.22); transition:transform .15s ease; }
-.gw-switch-on .gw-switch-knob { transform:translateX(14px); }
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 15%, transparent); }
+.gw-switch-on { background:var(--dsw-alias-label-primary); }
+.gw-switch-knob { position:absolute; top:2px; left:2px; width:26px; height:26px; border-radius:13px;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .16s ease; }
+.gw-switch-on .gw-switch-knob { transform:translateX(22px); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
@@ -2056,33 +2062,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
       const [prefs, setPrefs] = useState(() => loadPrefs(cwd))
-      /* 插件详情页里的设置是权威值；本地那份只当会话级覆盖。用户没在本地改过，
-         就用插件设置里的每页条数与刷新间隔。 */
-      useEffect(() => {
-        if (cwd === '') return undefined
-        let alive = true
-        void (async () => {
-          try {
-            const data = await api('settings', {})
-            if (alive === false || data === null || data === undefined) return
-            let stored = false
-            try {
-              stored = globalThis.localStorage !== undefined
-                && globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
-            } catch (error) {
-              void error
-            }
-            if (stored === true) return
-            setPrefs({
-              poll: typeof data.pollMs === 'number' ? data.pollMs : 3000,
-              page: typeof data.pageSize === 'number' ? data.pageSize : 100,
-            })
-          } catch (failure) {
-            void failure
-          }
-        })()
-        return () => { alive = false }
-      }, [cwd])
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
