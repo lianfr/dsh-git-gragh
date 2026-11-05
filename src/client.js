@@ -403,9 +403,9 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
 .gw-menu-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-check { display:flex; align-items:center; gap:6px; margin-top:2px;
-  font-size:11.5px; color:var(--dsw-alias-label-secondary); cursor:pointer; }
-.gw-check input { width:13px; height:13px; margin:0; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
-.gw-note { font-size:11.5px; line-height:1.6; color:var(--dsw-alias-label-secondary);
+  font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+.gw-check input { width:15px; height:15px; margin:0; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
+.gw-note { font-size:14px; line-height:22px; color:var(--dsw-alias-label-secondary);
   margin-bottom:8px; white-space:pre-wrap; }
 .gw-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
 .gw-btn-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 85%, #000); }
@@ -422,24 +422,26 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-menu-parent:hover > .gw-menu-sub { display:block; }
 .gw-menu-sep { height:1px; margin:4px 7px; background:var(--dsw-alias-border-l1); }
 .gw-scrim { position:fixed; inset:0; z-index:9998; background:var(--dsw-alias-bg-mask-1, rgba(0,0,0,.32));
-  display:flex; align-items:center; justify-content:center; padding:24px; }
-.gw-card { width:100%; max-width:380px; max-height:100%; display:flex; flex-direction:column;
-  overflow:hidden;
-  border-radius:var(--dsw-radius-panel, 28px);
-  background:var(--dsw-alias-bg-layer-2); border:none;
-  box-shadow:0 16px 40px rgba(0,0,0,.34); overflow:hidden; }
-.gw-card-head { display:flex; align-items:center; gap:8px; padding:18px 20px 8px;
-  font-size:14px; font-weight:600; color:var(--dsw-alias-label-primary); }
+  backdrop-filter:var(--dsw-mask-blur); display:flex; align-items:center; justify-content:center; padding:24px; }
+.gw-card { width:100%; max-width:min(380px, 100%); max-height:100%; box-sizing:border-box;
+  display:flex; flex-direction:column; overflow:hidden; padding:0 0 24px;
+  border-radius:var(--dsw-radius-panel, 28px); border:none;
+  background:var(--dsw-alias-bg-layer-2); box-shadow:var(--dsw-elevation-prominent); }
+.gw-card-head { display:flex; align-items:center; gap:8px; padding:22px 14px 12px 24px;
+  font-size:16px; line-height:24px; font-weight:500; color:var(--dsw-alias-label-primary); }
 .gw-card-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gw-card-close { flex:none; display:flex; align-items:center; justify-content:center;
-  width:24px; height:24px; padding:0; border:none; border-radius:var(--dsw-radius-sm, 8px);
+  width:28px; height:28px; padding:0; border:none; border-radius:var(--dsw-radius-sm, 8px);
   background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer;
   font-size:16px; line-height:1; }
 .gw-card-close:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
-.gw-card-body { flex:1 1 auto; min-height:0; overflow:auto; padding:4px 20px 12px;
-  font-size:13px; color:var(--dsw-alias-label-primary); }
-.gw-card-foot { flex:none; padding:4px 20px 20px;
+.gw-card-body { flex:1 1 auto; min-height:0; overflow:auto; margin-top:8px; padding:0 24px;
+  font-size:14px; line-height:22px; color:var(--dsw-alias-label-primary); }
+.gw-card-foot { flex:none; padding:0 24px; margin-top:20px;
   display:flex; justify-content:flex-end; gap:8px; }
+/* 对话框里的按钮单独放大：外壳上的按钮要跟着列表条走，不能一起吃这套尺寸。 */
+.gw-card .gw-btn { height:32px; padding:0 14px; font-size:13px; border-radius:var(--dsw-radius-md, 12px); }
+.gw-card .gw-btn-primary { border:1px solid transparent; }
 .gw-remote { display:flex; align-items:center; gap:8px; padding:6px 12px; }
 .gw-remote:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-remote-name { flex:none; font-size:11.5px; font-weight:600; color:var(--dsw-alias-label-primary);
@@ -450,10 +452,10 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-remote-actions { flex:none; display:flex; gap:2px; }
 .gw-form { display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
 .gw-field { display:flex; flex-direction:column; gap:3px; }
-.gw-field > span { font-size:10.5px; color:var(--dsw-alias-label-tertiary); }
-.gw-input { height:26px; padding:0 8px; font-size:11.5px; box-sizing:border-box;
-  border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
-  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-1);
+.gw-field > span { font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
+.gw-input { height:34px; padding:0 12px; font-size:13px; line-height:1.5; box-sizing:border-box;
+  border-radius:var(--dsw-radius-md, 12px);
+  border:.5px solid var(--dsw-alias-border-l4); background:var(--dsw-alias-bg-layer-3);
   color:var(--dsw-alias-label-primary); outline:none;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-input:focus { border-color:var(--dsw-alias-brand-primary); }
