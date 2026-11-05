@@ -1705,22 +1705,46 @@ window.__ModuleLoader__.load({
         }
       }, [cwd])
 
-      /* 「打开文件」交给侧边栏自带的编辑器，开成新标签页，不占用下半区的图区。 */
-      const openInEditor = useCallback((item) => {
+      /* 侧边栏自带一个隐藏的 diff 标签，给它一个 SidebarDiffRef 就能在新标签页里
+         画出红绿行号的那种视图。优先用它，拿不到服务才退回下半区的内联预览。 */
+      const openDiffTab = useCallback((ref, title) => {
         const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
-        if (service === undefined || service === null || typeof service.openFile !== 'function') {
-          void openWorkDiff(item)
-          return
-        }
+        if (service === undefined || service === null || typeof service.openTab !== 'function') return false
+        const key = ref.kind === 'worktree'
+          ? 'diff:worktree:' + ref.path + ':' + String(ref.staged)
+          : 'diff:commit:' + ref.hashFull
         try {
-          service.openFile(scope, item.path)
+          service.openTab({ type: 'diff', id: key, title: title, diff: ref }, scope)
+          return true
         } catch (failure) {
           void failure
-          void openWorkDiff(item)
+          return false
         }
-      }, [ctx, scope, openWorkDiff])
+      }, [ctx, scope])
 
+      /* 工作区的文件：单文件 diff，未暂存与已暂存各看各的那一侧。 */
+      const openInEditor = useCallback((item) => {
+        const staged = item !== null && item !== undefined && item.staged === true && item.unstaged !== true
+        const ref = {
+          kind: 'worktree',
+          path: item.path,
+          staged: staged,
+          untracked: item.untracked === true,
+        }
+        if (openDiffTab(ref, item.path) === true) return
+        void openWorkDiff(item)
+      }, [openDiffTab, openWorkDiff])
+
+      /* 提交详情里的文件：侧边栏的 diff 标签只认「整个提交」，here 就打开该提交。 */
       const openCommitDiff = useCallback(async (file) => {
+        if (selected === null || detail === null) return
+        const ref = {
+          kind: 'commit',
+          hash: String(selected).slice(0, 7),
+          hashFull: String(selected),
+          subject: detail.subject,
+        }
+        if (openDiffTab(ref, file.path) === true) return
         setDiffView({ title: file.path, text: '', loading: true })
         try {
           const data = await api('fileDiff', { cwd: cwd, hash: selected, path: file.path })
@@ -1728,7 +1752,7 @@ window.__ModuleLoader__.load({
         } catch (failure) {
           if (aliveRef.current) setDiffView({ title: file.path, text: String(failure.message), loading: false })
         }
-      }, [cwd, selected])
+      }, [cwd, selected, detail, openDiffTab])
 
       const doStage = useCallback((item) => {
         void run(async () => {
