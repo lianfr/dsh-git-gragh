@@ -442,7 +442,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 /* 对话框里的按钮单独放大：外壳上的按钮要跟着列表条走，不能一起吃这套尺寸。 */
 .gw-card .gw-btn { height:32px; padding:0 14px; font-size:13px; border-radius:var(--dsw-radius-md, 12px); }
 .gw-card .gw-btn-primary { border:1px solid transparent; }
-.gw-remote { display:flex; align-items:center; gap:8px; padding:6px 12px; }
+.gw-remote { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--dsw-radius-md, 12px); }
 .gw-remote:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-remote-name { flex:none; font-size:11.5px; font-weight:600; color:var(--dsw-alias-label-primary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
@@ -450,7 +450,10 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   font-size:10.5px; color:var(--dsw-alias-label-tertiary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-remote-actions { flex:none; display:flex; gap:2px; }
-.gw-form { display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
+.gw-form { display:flex; flex-direction:column; gap:14px; }
+.gw-remote-list { display:flex; flex-direction:column; gap:2px; }
+.gw-remote-main { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
+.gw-card-actions { display:flex; gap:8px; }
 .gw-field { display:flex; flex-direction:column; gap:3px; }
 .gw-field > span { font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
 .gw-input { height:34px; padding:0 12px; font-size:13px; line-height:1.5; box-sizing:border-box;
@@ -1439,6 +1442,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             }, t('save')))))
     }
 
+    /* 列表和表单不并排：表单打开时它就是正文，底部只留取消与保存；
+       表单关着时正文是远程列表，底部只留「添加远程」。两个动作区不同时出现。 */
     function RemoteDialog(props) {
       const t = props.t
       const list = Array.isArray(props.list) ? props.list : []
@@ -1455,25 +1460,49 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         )
       }
 
-      const form = draft === null ? null : E('div', { className: 'gw-form' },
-        E('label', { className: 'gw-field' }, E('span', null, t('remoteName')),
-          E('input', {
-            className: 'gw-input', value: draft.name, disabled: busy,
-            onChange: (event) => setDraft({ ...draft, name: event.target.value }),
-          })),
-        E('label', { className: 'gw-field' }, E('span', null, t('remoteUrl')),
-          E('input', {
-            className: 'gw-input', value: draft.url, disabled: busy,
-            onChange: (event) => setDraft({ ...draft, url: event.target.value }),
-          })),
-        E('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: '6px' } },
-          E('button', {
-            className: 'gw-btn gw-btn-ghost gw-btn-sm', disabled: busy,
-            onClick: () => setDraft(null),
-          }, t('cancel')),
-          E('button', {
-            className: 'gw-btn gw-btn-primary gw-btn-sm', disabled: busy, onClick: submit,
-          }, t('save'))))
+      let body = null
+      if (draft !== null) {
+        body = E('div', { className: 'gw-form' },
+          E('label', { className: 'gw-field' }, E('span', null, t('remoteName')),
+            E('input', {
+              className: 'gw-input', value: draft.name, disabled: busy,
+              placeholder: 'origin',
+              onChange: (event) => setDraft({ ...draft, name: event.target.value }),
+            })),
+          E('label', { className: 'gw-field' }, E('span', null, t('remoteUrl')),
+            E('input', {
+              className: 'gw-input', value: draft.url, disabled: busy,
+              placeholder: 'git@github.com:owner/repo.git',
+              onChange: (event) => setDraft({ ...draft, url: event.target.value }),
+            })))
+      } else if (list.length === 0) {
+        body = E('div', { className: 'gw-empty' }, t('remoteEmpty'))
+      } else {
+        body = E('div', { className: 'gw-remote-list' }, list.map((item) => E('div', {
+          className: 'gw-remote', key: item.name,
+        },
+          E('div', { className: 'gw-remote-main' },
+            E('span', { className: 'gw-remote-name' }, item.name),
+            E('span', { className: 'gw-remote-url', title: item.fetchUrl }, item.fetchUrl)),
+          E('div', { className: 'gw-remote-actions' },
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: () => setDraft({ mode: 'edit', name: item.name, url: item.fetchUrl, original: item.name }),
+            }, t('remoteEdit')),
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: () => { void props.onRemove(item.name) },
+            }, t('remoteRemove'))))))
+      }
+
+      const foot = draft === null
+        ? E('button', {
+          className: 'gw-btn gw-btn-primary', disabled: busy,
+          onClick: () => setDraft({ mode: 'add', name: 'origin', url: '', original: '' }),
+        }, t('remoteAdd'))
+        : E('div', { className: 'gw-card-actions' },
+          E('button', { className: 'gw-btn gw-btn-ghost', disabled: busy, onClick: () => setDraft(null) }, t('cancel')),
+          E('button', { className: 'gw-btn gw-btn-primary', disabled: busy, onClick: submit }, t('save')))
 
       return E('div', {
         className: 'gw-scrim',
@@ -1481,30 +1510,10 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       },
         E('div', { className: 'gw-card' },
           E('div', { className: 'gw-card-head' },
-            t('remotes'),
-            E('span', { className: 'gw-spacer' }),
-            E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, '✕')),
-          E('div', { className: 'gw-card-body' },
-            list.length === 0 && draft === null
-              ? E('div', { className: 'gw-empty' }, t('remoteEmpty'))
-              : list.map((item) => E('div', { className: 'gw-remote', key: item.name },
-                  E('span', { className: 'gw-remote-name' }, item.name),
-                  E('span', { className: 'gw-remote-url', title: item.fetchUrl }, item.fetchUrl),
-                  E('div', { className: 'gw-remote-actions' },
-                    E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: () => setDraft({ mode: 'edit', name: item.name, url: item.fetchUrl, original: item.name }),
-                    }, t('remoteEdit')),
-                    E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: () => { void props.onRemove(item.name) },
-                    }, t('remoteRemove'))))),
-            form),
-          E('div', { className: 'gw-card-foot' },
-            E('button', {
-              className: 'gw-btn gw-btn-sm', disabled: busy,
-              onClick: () => setDraft({ mode: 'add', name: 'origin', url: '', original: '' }),
-            }, t('remoteAdd')))))
+            E('span', { className: 'gw-card-title' }, t('remotes')),
+            E('button', { className: 'gw-card-close', onClick: props.onClose }, '\u2715')),
+          E('div', { className: 'gw-card-body' }, body),
+          E('div', { className: 'gw-card-foot' }, foot)))
     }
 
     function FileRow(props) {
@@ -2944,15 +2953,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
               })
             }),
             menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
-            menuRow(t('openInTerminal'), () => {
-              setMoreOpen(false)
-              setAsk({
-                title: t('openInTerminal'),
-                message: 'cd ' + JSON.stringify(cwd),
-                confirmLabel: t('close'),
-                onOk: () => {},
-              })
-            }),
             E('div', { key: 'sep-output', className: 'gw-menu-sep' }),
             menuRow(t('showOutput'), () => {
               setMoreOpen(false)
