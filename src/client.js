@@ -19,7 +19,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   const PREFS_PAGE = [50, 100, 200]
 
   function loadPrefs(key) {
-    const fallback = { poll: 3000, page: 100 }
+    const fallback = { poll: 3000, page: 100, showUncommitted: true, confirmDiscard: true }
     try {
       const raw = globalThis.localStorage === undefined ? null : globalThis.localStorage.getItem('gw-prefs:' + key)
       if (raw === null) return fallback
@@ -27,6 +27,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       return {
         poll: PREFS_POLL.indexOf(parsed.poll) >= 0 ? parsed.poll : fallback.poll,
         page: PREFS_PAGE.indexOf(parsed.page) >= 0 ? parsed.page : fallback.page,
+        showUncommitted: parsed.showUncommitted !== false,
+        confirmDiscard: parsed.confirmDiscard !== false,
       }
     } catch (error) {
       void error
@@ -118,7 +120,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-caret { width:12px; flex:none; color:var(--dsw-alias-label-tertiary); opacity:.9;
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
-.gw-card-wide { max-width:560px; }
 .gw-output-bar { display:flex; align-items:center; gap:6px; padding:4px 10px; flex:none;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
 .gw-output-exe { font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -126,20 +127,26 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   white-space:nowrap; max-width:45%; }
 /* 原生 select 的下拉由浏览器画，位置和外溢都管不住，这里改成自己画一层。 */
 .gw-dd { position:relative; display:inline-flex; }
-.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-xs, 4px);
-  border:1px solid var(--dsw-alias-border-l2); background:transparent; color:var(--dsw-alias-label-secondary);
+.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-sm, 8px);
+  border:none; background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
+  color:var(--dsw-alias-label-secondary);
   font-size:11px; cursor:pointer; white-space:nowrap; }
-.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent); }
 .gw-dd-scrim { position:fixed; inset:0; z-index:70; }
 .gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
-  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-md, 12px);
-  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
-  box-shadow:0 10px 28px rgba(0, 0, 0, .16); }
-.gw-dd-item { display:block; width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
+  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-lg, 16px);
+  border:none; background:var(--dsw-alias-bg-layer-2);
+  box-shadow:0 12px 32px rgba(0, 0, 0, .18); }
+.gw-dd-item { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
   border:none; background:transparent; border-radius:var(--dsw-radius-sm, 8px);
   font-size:11px; color:var(--dsw-alias-label-secondary); cursor:pointer; white-space:nowrap; }
+.gw-dd-text { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.gw-dd-check { flex:none; color:var(--dsw-alias-label-primary); }
+.gw-dd-value { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.gw-dd-caret { flex:none; opacity:.75; }
 .gw-dd-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
-.gw-dd-item-on { color:var(--dsw-alias-brand-primary); font-weight:600; }
+.gw-dd-item-on { color:var(--dsw-alias-label-primary); font-weight:600; }
 .gw-output-search { height:22px; width:120px; box-sizing:border-box; padding:0 6px;
   border-radius:var(--dsw-radius-xs, 4px); border:1px solid var(--dsw-alias-border-l2);
   background:transparent; color:var(--dsw-alias-label-primary); font-size:11px; outline:none; }
@@ -160,6 +167,45 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-output-note { color:var(--dsw-alias-label-tertiary); }
 .gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
 .gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
+/* 设置面板：一行一项，名字与说明在左，控件在右，行间一条细线。 */
+.gw-set-list { display:flex; flex-direction:column; }
+/* 每行：左边标题加说明，右边控件，底部一条极淡的分隔线。 */
+.gw-set-item { display:flex; align-items:center; gap:20px; padding:18px 0;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-set-item:last-child { border-bottom:none; }
+.gw-set-text { display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 auto; }
+.gw-set-name { font-size:15px; font-weight:500; line-height:1.3; color:var(--dsw-alias-label-primary); }
+.gw-set-desc { font-size:13px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
+/* 设置行里的下拉是浅灰圆角块，跟宿主设置页右侧控件同形 */
+.gw-set-item .gw-dd { min-width:0; }
+/* 宽度跟内容走，箭头紧贴文字右侧，不推到最右边 */
+.gw-set-item .gw-dd-btn { height:38px; padding:0 14px; border:none;
+  border-radius:16px; font-size:15px; line-height:1; color:var(--dsw-alias-label-primary);
+  display:inline-flex; align-items:center; justify-content:flex-start; gap:8px;
+  font-family:inherit;
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.gw-set-item .gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 13%, transparent); }
+/* 菜单是白卡：大圆角、无描边、柔和投影，项高固定，选中项右侧打勾 */
+/* 菜单宽度只由最长的那一项决定，不撑满、也不小于按钮 */
+.gw-set-item .gw-dd-menu { padding:6px; border-radius:26px;
+  background:var(--dsw-alias-bg-layer-1);
+  box-shadow:0 16px 40px rgba(0, 0, 0, .16), 0 2px 8px rgba(0, 0, 0, .06);
+  min-width:100%; width:max-content; max-width:min(260px, 88vw); }
+.gw-set-item .gw-dd-item { padding:0 14px; height:40px; box-sizing:border-box;
+  font-size:15px; border-radius:20px;
+  font-family:inherit; }
+.gw-set-item .gw-dd-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
+/* 开关：深色实心轨道，白点撑满高度 */
+/* 开关照宿主那套来：36×20、padding 2、圆角 999px，白点 16 撑满内区 */
+.gw-switch { position:relative; flex:none; width:36px; height:20px; padding:2px;
+  box-sizing:border-box; border:none; border-radius:999px;
+  cursor:pointer; transition:background .12s ease;
+  background:var(--dsw-alias-border-l3); }
+.gw-switch-on { background:var(--dsw-alias-brand-primary); }
+.gw-switch-knob { display:block; width:16px; height:16px; border-radius:50%;
+  background:var(--dsw-alias-switch-thumb, #fff);
+  transition:transform .12s ease; }
+.gw-switch-on .gw-switch-knob { transform:translateX(16px); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
@@ -427,6 +473,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   display:flex; flex-direction:column; overflow:hidden; padding:0 0 24px;
   border-radius:var(--dsw-radius-panel, 28px); border:none;
   background:var(--dsw-alias-bg-layer-2); box-shadow:var(--dsw-elevation-prominent); }
+/* 设置页要多放几项，单独放宽 */
+.gw-card.gw-card-wide { max-width:min(560px, 100%); }
 .gw-card-head { display:flex; align-items:center; gap:8px; padding:22px 14px 12px 24px;
   font-size:16px; line-height:24px; font-weight:500; color:var(--dsw-alias-label-primary); }
 .gw-card-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -502,7 +550,15 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         treeView: '以树形式查看',
         flatView: '以列表形式查看',
         settings: '设置',
+        openPluginSettings: '打开插件设置',
         pollLabel: '自动刷新',
+    pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
+    pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
+    uncommittedLabel: '显示未提交的更改',
+    uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
+    confirmDiscardLabel: '撤销前确认',
+    confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
+    showUncommitted: '显示未提交的更改',
         pageLabel: '每页条数',
         off: '关闭',
         clone: '克隆…',
@@ -648,7 +704,15 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         treeView: 'View as tree',
         flatView: 'View as list',
         settings: 'Settings',
+        openPluginSettings: 'Open plugin settings',
         pollLabel: 'Auto refresh',
+      pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
+      pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
+      uncommittedLabel: 'Show uncommitted changes',
+      uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
+      confirmDiscardLabel: 'Confirm before discarding',
+      confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
+      showUncommitted: 'Show uncommitted changes',
         pageLabel: 'Rows per page',
         off: 'Off',
         clone: 'Clone…',
@@ -1331,7 +1395,13 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         E('button', {
           className: 'gw-dd-btn',
           onClick: () => setOpen(open === false),
-        }, (current === undefined ? props.value : current.label) + ' \u25BE'),
+        },
+          E('span', { className: 'gw-dd-value' }, current === undefined ? props.value : current.label),
+          E('svg', {
+            className: 'gw-dd-caret', width: 11, height: 11, viewBox: '0 0 16 16',
+            fill: 'none', stroke: 'currentColor', strokeWidth: 1.5,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          }, E('path', { d: 'M4 6.4 8 10.4 12 6.4' }))),
         open === false ? null : E('div', { className: 'gw-dd-scrim', onClick: () => setOpen(false) }),
         open === false ? null : E('div', { className: 'gw-dd-menu' },
           props.options.map((option) => E('button', {
@@ -1341,7 +1411,13 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
               setOpen(false)
               props.onPick(option.value)
             },
-          }, option.label))))
+          },
+            E('span', { className: 'gw-dd-text' }, option.label),
+            option.value === props.value ? E('svg', {
+              className: 'gw-dd-check', width: 12, height: 12, viewBox: '0 0 16 16',
+              fill: 'none', stroke: 'currentColor', strokeWidth: 1.7,
+              strokeLinecap: 'round', strokeLinejoin: 'round',
+            }, E('path', { d: 'M3.2 8.4 6.2 11.4 12.8 4.8' })) : null))))
     }
 
     function OutputPane(props) {
@@ -1424,33 +1500,69 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     }
 
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
+    /* 开关：与宿主设置页同形的胶囊滑块。 */
+    function SettingSwitch(props) {
+      return E('button', {
+        type: 'button',
+        className: 'gw-switch' + (props.on === true ? ' gw-switch-on' : ''),
+        role: 'switch',
+        'aria-checked': props.on === true ? 'true' : 'false',
+        onClick: () => props.onFlip(props.on !== true),
+      }, E('span', { className: 'gw-switch-knob' }))
+    }
+
+    /* 设置面板：一行一项，左边名字与一行说明，右边一个控件——与宿主设置页同一套排法。 */
     function SettingsDialog(props) {
       const t = props.t
       const [poll, setPoll] = useState(props.prefs.poll)
       const [page, setPage] = useState(props.prefs.page)
-      const row = (label, values, current, onPick, format) => E('div', { className: 'gw-set-row' },
-        E('span', { className: 'gw-set-label' }, label),
-        E('div', { className: 'gw-set-opts' }, values.map((value) => E('button', {
-          key: String(value),
-          className: 'gw-set-opt' + (value === current ? ' gw-set-opt-on' : ''),
-          onClick: () => onPick(value),
-        }, format(value)))))
+      const [showUncommitted, setShowUncommitted] = useState(props.prefs.showUncommitted !== false)
+      const [confirmDiscard, setConfirmDiscard] = useState(props.prefs.confirmDiscard !== false)
+
+      const item = (key, name, desc, control) => E('div', { key: key, className: 'gw-set-item' },
+        E('div', { className: 'gw-set-text' },
+          E('span', { className: 'gw-set-name' }, name),
+          E('span', { className: 'gw-set-desc' }, desc)),
+        control)
+
+      const pick = (key, name, desc, options, current, onPick) => item(key, name, desc,
+        E(DropDown, {
+          value: String(current),
+          options: options,
+          onPick: (value) => onPick(Number(value)),
+        }))
+
       return E('div', {
         className: 'gw-scrim',
         onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
       },
-        E('div', { className: 'gw-card' },
+        E('div', { className: 'gw-card gw-card-wide' },
           E('div', { className: 'gw-card-head' },
             E('span', { className: 'gw-card-title' }, t('settings')),
             E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
           E('div', { className: 'gw-card-body' },
-            row(t('pollLabel'), PREFS_POLL, poll, setPoll, (value) => value === 0 ? t('off') : String(value / 1000) + 's'),
-            row(t('pageLabel'), PREFS_PAGE, page, setPage, (value) => String(value))),
+            E('div', { className: 'gw-set-list' },
+              pick('poll', t('pollLabel'), t('pollDesc'), PREFS_POLL.map((value) => ({
+                value: String(value),
+                label: value === 0 ? t('off') : String(value / 1000) + ' 秒',
+              })), poll, setPoll),
+              pick('page', t('pageLabel'), t('pageDesc'), PREFS_PAGE.map((value) => ({
+                value: String(value),
+                label: String(value),
+              })), page, setPage),
+              item('uncommitted', t('uncommittedLabel'), t('uncommittedDesc'),
+                E(SettingSwitch, { on: showUncommitted, onFlip: setShowUncommitted })),
+              item('discard', t('confirmDiscardLabel'), t('confirmDiscardDesc'),
+                E(SettingSwitch, { on: confirmDiscard, onFlip: setConfirmDiscard })))),
           E('div', { className: 'gw-card-foot' },
+            E('span', { className: 'gw-spacer' }),
             E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, t('cancel')),
             E('button', {
               className: 'gw-btn gw-btn-primary gw-btn-sm',
-              onClick: () => props.onSave({ poll: poll, page: page }),
+              onClick: () => props.onSave({
+                poll: poll, page: page,
+                showUncommitted: showUncommitted, confirmDiscard: confirmDiscard,
+              }),
             }, t('save')))))
     }
 
@@ -1986,6 +2098,33 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
       const [prefs, setPrefs] = useState(() => loadPrefs(cwd))
+      /* 插件详情页里的设置是权威值；本地那份只当会话级覆盖。用户没在本地改过，
+         就用插件设置里的每页条数与刷新间隔。 */
+      useEffect(() => {
+        if (cwd === '') return undefined
+        let alive = true
+        void (async () => {
+          try {
+            const data = await api('settings', {})
+            if (alive === false || data === null || data === undefined) return
+            let stored = false
+            try {
+              stored = globalThis.localStorage !== undefined
+                && globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+            } catch (error) {
+              void error
+            }
+            if (stored === true) return
+            setPrefs({
+              poll: typeof data.pollMs === 'number' ? data.pollMs : 3000,
+              page: typeof data.pageSize === 'number' ? data.pageSize : 100,
+            })
+          } catch (failure) {
+            void failure
+          }
+        })()
+        return () => { alive = false }
+      }, [cwd])
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
@@ -2231,7 +2370,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       }, [cwd, run, refreshSummary])
 
       const doDiscard = useCallback((item) => {
-        const ok = window.confirm(t('discardConfirm', { path: item.path }))
+        const ok = prefs.confirmDiscard === false || window.confirm(t('discardConfirm', { path: item.path }))
         if (!ok) return
         void run(async () => {
           await api('discard', { cwd: cwd, paths: [item.path], confirm: true })
@@ -2241,7 +2380,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const doDiscardAll = useCallback((items) => {
         if (items.length === 0) return
-        const ok = window.confirm(t('discardAllConfirm', { count: String(items.length) }))
+        const ok = prefs.confirmDiscard === false || window.confirm(t('discardAllConfirm', { count: String(items.length) }))
         if (!ok) return
         void run(async () => {
           await api('discard', { cwd: cwd, paths: items.map((item) => item.path), confirm: true })
@@ -2402,7 +2541,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const changeTotal = conflicted.length + staged.length + unstaged.length + untracked.length
       const headHash = summary === null || summary.head === undefined ? null : summary.head
       const allEntries = useMemo(() => {
-        if (changeTotal === 0) return entries
+        if (changeTotal === 0 || prefs.showUncommitted === false) return entries
         return [{
           hash: UNCOMMITTED_HASH,
           short: '',
@@ -2413,7 +2552,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           subject: t('uncommitted') + ' (' + String(changeTotal) + ')',
           uncommitted: true,
         }].concat(entries)
-      }, [entries, changeTotal, headHash, t])
+      }, [entries, changeTotal, headHash, t, prefs.showUncommitted])
 
       /* 聚焦只留当前分支这一条第一父链，其余提交收起来；全览原样显示。 */
       const rowEntries = useMemo(() => {
@@ -2645,6 +2784,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         }),
         iconButton({
           title: t('settings'),
+          /* 小齿轮开面板内的设置；宿主那个插件详情页从设置里的按钮进。 */
           onClick: () => setSettingsOpen(true),
           path: 'M6.58 3.31L6.87 1.70L9.13 1.70L9.42 3.31L11.35 4.43L12.89 3.87L14.02 5.83'
             + 'L12.77 6.88L12.77 9.12L14.02 10.17L12.89 12.13L11.35 11.57L9.42 12.69L9.13 14.30'
@@ -2669,8 +2809,16 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const head = E('div', { className: 'gw-graph-head' },
         E('span', { className: 'gw-branch' },
-          E('svg', { width: 12, height: 12, viewBox: '0 0 16 16', fill: 'currentColor' },
-            E('path', { d: 'M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 1.2a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM5 6v4a2 2 0 1 0 .9 1.66V6H5zm0 6.4a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM10.5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 1.2a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM10.5 6c1.4 0 2.5 1.1 2.5 2.5S11.9 11 10.5 11H8a1 1 0 0 0-1 1v1h1v-1h2.5C12.4 12 14 10.4 14 8.5S12.4 5 10.5 5V6z' })),
+          E('svg', {
+            width: 12, height: 12, viewBox: '0 0 16 16',
+            fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          },
+            E('path', { key: 'trunk', d: 'M4.6 5.2v5.6' }),
+            E('path', { key: 'fork', d: 'M4.6 10.8h4.2a1.6 1.6 0 0 0 1.6-1.6V7.4' }),
+            E('circle', { key: 'a', cx: 4.6, cy: 3.6, r: 1.5 }),
+            E('circle', { key: 'b', cx: 4.6, cy: 12.4, r: 1.5 }),
+            E('circle', { key: 'c', cx: 10.4, cy: 6, r: 1.5 })),
           summary === null || summary.branch === null || summary.branch === undefined
             ? (summary !== null && summary.empty === true ? t('noCommits') : t('unknown'))
             : (summary.detached === true ? 'HEAD@' + String(summary.branch).slice(0, 7) : summary.branch)),
