@@ -65,9 +65,11 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
-/* 树容器是分组标题的兄弟节点，不是它的子节点，所以不能挂在 .gw-group-head 下。 */
-.gw-tree-kids { border-left:1px solid var(--dsw-alias-border-l2);
-  margin-left:14px; padding-left:0; }
+/* 缩进只认一条规则：下一级的折叠三角，对齐上一级图标所在的位置。
+   三角宽 12px、图标前间距 6px，所以每层固定 18px。分组标题是最高一级，
+   顶层目录在此基础上再缩一级，于是标题的文字与顶层目录的三角对齐。 */
+.gw-tree-root { padding-left:18px; }
+.gw-tree-kids { margin-left:18px; }
 .gw-file-lead { width:12px; flex:none; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
 .gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
@@ -1403,7 +1405,7 @@ window.__ModuleLoader__.load({
             props.action === undefined || props.action === null ? null : props.action),
           E('span', { className: 'gw-badge' }, String(items.length))),
         props.open === false ? null : props.tree === true
-          ? buildTree(items).map((node, index) => E(TreeRow, {
+          ? E('div', { className: 'gw-tree-root' }, buildTree(items).map((node, index) => E(TreeRow, {
               key: 't' + String(index),
               node: node,
               depth: 0,
@@ -1415,7 +1417,7 @@ window.__ModuleLoader__.load({
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
-            }))
+            })))
           : items.map((item, index) => E(FileRow, {
               key: item.path + ':' + String(index),
               item: item,
