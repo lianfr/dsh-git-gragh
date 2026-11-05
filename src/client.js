@@ -3441,6 +3441,49 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         E('path', { d: 'M17 11.1v.9a3.2 3.2 0 0 1-3.2 3.2H9.2' }))
     }
 
+    /* 原生 main 面板不绑会话，目录跟着最近活跃的那个会话走。 */
+    function NativePanel(props) {
+      const ctx = props.ctx === undefined || props.ctx === null ? undefined : props.ctx
+      const [cwd, setCwd] = useState('')
+
+      useEffect(() => {
+        if (ctx === undefined) return undefined
+        const read = () => {
+          const sessions = ctx.get('sessions')
+          const list = sessions === undefined || sessions === null ? undefined : sessions.list
+          if (list === undefined || typeof list.getSnapshot !== 'function') return
+          let snapshot = null
+          try {
+            snapshot = list.getSnapshot()
+          } catch (error) {
+            void error
+          }
+          const ids = snapshot !== null && snapshot !== undefined && Array.isArray(snapshot.ids) ? snapshot.ids : []
+          for (let i = 0; i < ids.length; i += 1) {
+            const found = sessionCwdOf(ctx, ids[i])
+            if (found !== undefined) {
+              setCwd(found)
+              return
+            }
+          }
+          setCwd('')
+        }
+        read()
+        const sessions = ctx.get('sessions')
+        const handle = sessions !== undefined && sessions !== null && sessions.list !== undefined
+          && typeof sessions.list.subscribe === 'function'
+          ? sessions.list.subscribe(read) : undefined
+        return () => {
+          if (typeof handle === 'function') handle()
+        }
+      }, [ctx])
+
+      if (cwd !== '') return E(GitPanel, { ctx: ctx, scope: { sessionId: '', cwd: cwd }, visible: true })
+      const t = ctx === undefined ? (key) => key : translatorOf(ctx)
+      return E('div', { className: 'gw-root' },
+        E('div', { className: 'gw-empty' }, t('noRepo')))
+    }
+
     function apply(ctx) {
       injectStyles()
       ctx.inject(['betterSidebar'], (tabCtx) => {
@@ -3487,6 +3530,29 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             if (typeof offOutput === 'function') offOutput()
           }
         }, 'dsh-git-graph: sidebar tab')
+      })
+
+      /* 原生侧边栏：图标挂在 sidebar.panellist，面板挂在 main，两者同一个 id。
+         原生面板不绑会话，所以目录跟着最近活跃的那个会话走。 */
+      ctx.inject(['slots'], (slotCtx) => {
+        slotCtx.effect(() => {
+          const t = translatorOf(slotCtx)
+          const offIcon = slotCtx.slots.register({
+            name: 'sidebar.panellist',
+            id: 'git-graph',
+            order: 60,
+            label: () => t('title'),
+          }, (iconProps) => E(TabIcon, { size: iconProps.size }))
+          const offPanel = slotCtx.slots.register({
+            name: 'main',
+            key: 'git-graph',
+            inject: () => ({ ctx: slotCtx }),
+          }, NativePanel)
+          return () => {
+            if (typeof offIcon === 'function') offIcon()
+            if (typeof offPanel === 'function') offPanel()
+          }
+        }, 'dsh-git-graph: 原生侧边栏')
       })
     }
 
