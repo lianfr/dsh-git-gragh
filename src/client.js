@@ -61,15 +61,15 @@ window.__ModuleLoader__.load({
   background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-secondary); }
 .gw-group-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gw-group-actions { flex:none; display:flex; align-items:center; gap:2px; }
-.gw-group-head { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer;
+.gw-group-head { display:flex; align-items:center; gap:4px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
 .gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 /* 缩进只认一条规则：下一级的折叠三角，对齐上一级图标所在的位置。
-   三角宽 12px、图标前间距 6px，所以每层固定 18px。分组标题是最高一级，
-   顶层目录在此基础上再缩一级，于是标题的文字与顶层目录的三角对齐。 */
-.gw-tree-root { padding-left:18px; }
-.gw-tree-kids { margin-left:18px; }
+   三角宽 12px、间距 4px，所以每层固定 16px。分组标题行内距 10px，
+   它的文字落在 26px，顶层目录的三角也放在 26px，正好压在「未」字下面。 */
+.gw-tree-root { padding-left:26px; }
+.gw-tree-kids { margin-left:16px; }
 .gw-file-lead { width:12px; flex:none; }
 .gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
 .gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
@@ -103,7 +103,7 @@ window.__ModuleLoader__.load({
 .gw-count { color:var(--dsw-alias-label-tertiary); }
 .gw-group-actions { margin-left:auto; display:flex; gap:4px; }
 
-.gw-file { display:flex; align-items:center; gap:6px; height:22px; padding:0 10px 0 24px; cursor:pointer;
+.gw-file { display:flex; align-items:center; gap:4px; height:22px; padding:0 10px 0 24px; cursor:pointer;
   white-space:nowrap; }
 .gw-file:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-file-name { overflow:hidden; text-overflow:ellipsis; flex:1 1 auto; direction:rtl; text-align:left; }
