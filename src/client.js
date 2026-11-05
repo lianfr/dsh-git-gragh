@@ -124,9 +124,22 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-output-exe { font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size:10.5px; color:var(--dsw-alias-label-tertiary); overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; max-width:45%; }
-.gw-output-pick { height:22px; box-sizing:border-box; padding:0 4px; border-radius:var(--dsw-radius-xs, 4px);
+/* 原生 select 的下拉由浏览器画，位置和外溢都管不住，这里改成自己画一层。 */
+.gw-dd { position:relative; display:inline-flex; }
+.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-xs, 4px);
   border:1px solid var(--dsw-alias-border-l2); background:transparent; color:var(--dsw-alias-label-secondary);
-  font-size:11px; outline:none; }
+  font-size:11px; cursor:pointer; white-space:nowrap; }
+.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-scrim { position:fixed; inset:0; z-index:70; }
+.gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
+  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-md, 12px);
+  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
+  box-shadow:0 10px 28px rgba(0, 0, 0, .16); }
+.gw-dd-item { display:block; width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
+  border:none; background:transparent; border-radius:var(--dsw-radius-sm, 8px);
+  font-size:11px; color:var(--dsw-alias-label-secondary); cursor:pointer; white-space:nowrap; }
+.gw-dd-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-item-on { color:var(--dsw-alias-brand-primary); font-weight:600; }
 .gw-output-search { height:22px; width:120px; box-sizing:border-box; padding:0 6px;
   border-radius:var(--dsw-radius-xs, 4px); border:1px solid var(--dsw-alias-border-l2);
   background:transparent; color:var(--dsw-alias-label-primary); font-size:11px; outline:none; }
@@ -1293,6 +1306,27 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
     /** 下半区的「显示 Git 输出」：最近执行过的命令，最新的在前，和差异页同一个位置。 */
+    /* 菜单贴着按钮往下展开，右边缘对齐，不会往左压到内容上。 */
+    function DropDown(props) {
+      const [open, setOpen] = useState(false)
+      const current = props.options.find((option) => option.value === props.value)
+      return E('span', { className: 'gw-dd' },
+        E('button', {
+          className: 'gw-dd-btn',
+          onClick: () => setOpen(open === false),
+        }, (current === undefined ? props.value : current.label) + ' \u25BE'),
+        open === false ? null : E('div', { className: 'gw-dd-scrim', onClick: () => setOpen(false) }),
+        open === false ? null : E('div', { className: 'gw-dd-menu' },
+          props.options.map((option) => E('button', {
+            key: option.value,
+            className: 'gw-dd-item' + (option.value === props.value ? ' gw-dd-item-on' : ''),
+            onClick: () => {
+              setOpen(false)
+              props.onPick(option.value)
+            },
+          }, option.label))))
+    }
+
     function OutputPane(props) {
       const t = props.t
       const at = (ms) => {
@@ -1324,11 +1358,11 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           return hay.toLowerCase().indexOf(needle.toLowerCase()) >= 0
         })
       }, [props.records, level, kind, query])
-      const pick = (values, current, onPick, labelOf) => E('select', {
-        className: 'gw-output-pick',
+      const pick = (values, current, onPick, labelOf) => E(DropDown, {
         value: current,
-        onChange: (event) => onPick(event.target.value),
-      }, values.map((value) => E('option', { key: value, value: value }, labelOf(value))))
+        options: values.map((value) => ({ value: value, label: labelOf(value) })),
+        onPick: onPick,
+      })
       return E('div', { className: 'gw-diff' },
         E('div', { className: 'gw-diff-head' },
           E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '\u2190 ' + t('back')),
