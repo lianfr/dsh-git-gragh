@@ -267,10 +267,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   color:var(--dsw-alias-label-tertiary); cursor:pointer; opacity:0; }
 .gw-row:hover .gw-act, .gw-file:hover .gw-act, .gw-group-head:hover .gw-act { opacity:1; }
 .gw-act { position:relative; }
+/* 提示框用不透明色：宿主的底色变量带透明度，浮在提交行上会透出底下的字。
+   深浅两套直接写死，由面板根据主题挂 gw-dark 切换。 */
+.gw-dark .gw-act::after, .gw-dark .gw-icon::after {
+  background:#2b2d31; color:#f2f3f5; border-color:rgba(255,255,255,.14); }
 .gw-act::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:5px 8px; border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
-  background:var(--dsw-alias-bg-base, #ffffff); color:var(--dsw-alias-label-primary);
-  border:1px solid var(--dsw-alias-border-l2);
+  background:#ffffff; color:#1b1c1f;
+  border:1px solid rgba(0,0,0,.12);
   font-size:11px; line-height:1.3; white-space:nowrap; pointer-events:none;
   box-shadow:0 2px 8px rgba(0,0,0,.28); opacity:0; visibility:hidden;
   transition:opacity .12s ease, visibility .12s ease; z-index:10000; }
@@ -286,8 +290,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:3px 7px; border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
-  background:var(--dsw-alias-bg-base, #ffffff); color:var(--dsw-alias-label-primary);
-  border:1px solid var(--dsw-alias-border-l2); box-shadow:0 4px 14px rgba(0,0,0,.22);
+  background:#ffffff; color:#1b1c1f;
+  border:1px solid rgba(0,0,0,.12); box-shadow:0 4px 14px rgba(0,0,0,.22);
   font-size:11px; font-weight:400; line-height:1.4; white-space:nowrap;
   opacity:0; visibility:hidden; pointer-events:none; transition:opacity .12s ease; z-index:10000; }
 .gw-icon:hover::after { opacity:1; visibility:visible; }
@@ -2111,6 +2115,27 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [entries, setEntries] = useState([])
       const [hasMore, setHasMore] = useState(false)
       const [loadingMore, setLoadingMore] = useState(false)
+      /* 宿主的主题变量是透明色，提示框没法直接拿来当底；这里探一次当前明暗，
+         挂个类名给提示框选不透明色。切主题时根元素会变，顺便重探。 */
+      const [dark, setDark] = useState(() => window.matchMedia !== undefined && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      useEffect(() => {
+        const read = () => {
+          const probe = document.createElement('span')
+          probe.style.cssText = 'position:absolute;left:-9999px;top:0;color:var(--dsw-alias-label-primary)'
+          document.body.appendChild(probe)
+          const rgb = window.getComputedStyle(probe).color
+          probe.remove()
+          const parts = rgb.match(/\d+(\.\d+)?/g)
+          if (parts === null || parts.length < 3) return
+          const lum = Number(parts[0]) * 0.299 + Number(parts[1]) * 0.587 + Number(parts[2]) * 0.114
+          setDark(lum > 140)
+        }
+        read()
+        const watcher = new MutationObserver(read)
+        watcher.observe(document.documentElement, { attributes: true })
+        return () => watcher.disconnect()
+      }, [])
+
       const [error, setError] = useState(null)
       const errorSeq = useRef(0)
       const errorTimer = useRef(null)
@@ -2808,7 +2833,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       }
 
       if (cwd === '') {
-        return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
+        return E('div', { className: 'gw-root' + (dark ? ' gw-dark' : '') }, E('div', { className: 'gw-empty' }, t('noRepo')))
       }
 
       const isRepo = summary !== null && summary.isRepo === true
@@ -3102,7 +3127,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
                         onOpenFile: openCommitDiff,
                       })))
 
-      return E('div', { className: 'gw-root' },
+      return E('div', { className: 'gw-root' + (dark ? ' gw-dark' : '') },
         isRepo === false
           ? E('div', { className: 'gw-empty' }, t('noRepo'))
           : E('div', { style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 } },
