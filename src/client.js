@@ -19,7 +19,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   const PREFS_PAGE = [50, 100, 200]
 
   function loadPrefs(key) {
-    const fallback = { poll: 3000, page: 100 }
+    const fallback = { poll: 3000, page: 100, showUncommitted: true, confirmDiscard: true }
     try {
       const raw = globalThis.localStorage === undefined ? null : globalThis.localStorage.getItem('gw-prefs:' + key)
       if (raw === null) return fallback
@@ -27,6 +27,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       return {
         poll: PREFS_POLL.indexOf(parsed.poll) >= 0 ? parsed.poll : fallback.poll,
         page: PREFS_PAGE.indexOf(parsed.page) >= 0 ? parsed.page : fallback.page,
+        showUncommitted: parsed.showUncommitted !== false,
+        confirmDiscard: parsed.confirmDiscard !== false,
       }
     } catch (error) {
       void error
@@ -160,6 +162,22 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-output-note { color:var(--dsw-alias-label-tertiary); }
 .gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
 .gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
+/* 设置面板：一行一项，名字与说明在左，控件在右，行间一条细线。 */
+.gw-set-list { display:flex; flex-direction:column; }
+.gw-set-item { display:flex; align-items:center; gap:16px; padding:11px 0;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-set-item:last-child { border-bottom:none; }
+.gw-set-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
+.gw-set-name { font-size:13px; color:var(--dsw-alias-label-primary); }
+.gw-set-desc { font-size:12px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
+.gw-switch { position:relative; flex:none; width:34px; height:20px; padding:0; border:none;
+  border-radius:10px; cursor:pointer; transition:background .15s ease;
+  background:var(--dsw-alias-interactive-bg-active);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent); }
+.gw-switch-on { background:var(--dsw-alias-brand-primary); }
+.gw-switch-knob { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:8px;
+  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.22); transition:transform .15s ease; }
+.gw-switch-on .gw-switch-knob { transform:translateX(14px); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
@@ -502,7 +520,15 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         treeView: '以树形式查看',
         flatView: '以列表形式查看',
         settings: '设置',
+        openPluginSettings: '打开插件设置',
         pollLabel: '自动刷新',
+    pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
+    pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
+    uncommittedLabel: '显示未提交的更改',
+    uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
+    confirmDiscardLabel: '撤销前确认',
+    confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
+    showUncommitted: '显示未提交的更改',
         pageLabel: '每页条数',
         off: '关闭',
         clone: '克隆…',
@@ -648,7 +674,15 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         treeView: 'View as tree',
         flatView: 'View as list',
         settings: 'Settings',
+        openPluginSettings: 'Open plugin settings',
         pollLabel: 'Auto refresh',
+      pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
+      pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
+      uncommittedLabel: 'Show uncommitted changes',
+      uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
+      confirmDiscardLabel: 'Confirm before discarding',
+      confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
+      showUncommitted: 'Show uncommitted changes',
         pageLabel: 'Rows per page',
         off: 'Off',
         clone: 'Clone…',
@@ -1424,33 +1458,73 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     }
 
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
+    /* 开关：与宿主设置页同形的胶囊滑块。 */
+    function SettingSwitch(props) {
+      return E('button', {
+        type: 'button',
+        className: 'gw-switch' + (props.on === true ? ' gw-switch-on' : ''),
+        role: 'switch',
+        'aria-checked': props.on === true ? 'true' : 'false',
+        onClick: () => props.onFlip(props.on !== true),
+      }, E('span', { className: 'gw-switch-knob' }))
+    }
+
+    /* 设置面板：一行一项，左边名字与一行说明，右边一个控件——与宿主设置页同一套排法。 */
     function SettingsDialog(props) {
       const t = props.t
       const [poll, setPoll] = useState(props.prefs.poll)
       const [page, setPage] = useState(props.prefs.page)
-      const row = (label, values, current, onPick, format) => E('div', { className: 'gw-set-row' },
-        E('span', { className: 'gw-set-label' }, label),
-        E('div', { className: 'gw-set-opts' }, values.map((value) => E('button', {
-          key: String(value),
-          className: 'gw-set-opt' + (value === current ? ' gw-set-opt-on' : ''),
-          onClick: () => onPick(value),
-        }, format(value)))))
+      const [showUncommitted, setShowUncommitted] = useState(props.prefs.showUncommitted !== false)
+      const [confirmDiscard, setConfirmDiscard] = useState(props.prefs.confirmDiscard !== false)
+
+      const item = (key, name, desc, control) => E('div', { key: key, className: 'gw-set-item' },
+        E('div', { className: 'gw-set-text' },
+          E('span', { className: 'gw-set-name' }, name),
+          E('span', { className: 'gw-set-desc' }, desc)),
+        control)
+
+      const pick = (key, name, desc, options, current, onPick) => item(key, name, desc,
+        E(DropDown, {
+          value: String(current),
+          options: options,
+          onPick: (value) => onPick(Number(value)),
+        }))
+
       return E('div', {
         className: 'gw-scrim',
         onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
       },
-        E('div', { className: 'gw-card' },
+        E('div', { className: 'gw-card gw-card-wide' },
           E('div', { className: 'gw-card-head' },
             E('span', { className: 'gw-card-title' }, t('settings')),
             E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
           E('div', { className: 'gw-card-body' },
-            row(t('pollLabel'), PREFS_POLL, poll, setPoll, (value) => value === 0 ? t('off') : String(value / 1000) + 's'),
-            row(t('pageLabel'), PREFS_PAGE, page, setPage, (value) => String(value))),
+            E('div', { className: 'gw-set-list' },
+              pick('poll', t('pollLabel'), t('pollDesc'), PREFS_POLL.map((value) => ({
+                value: String(value),
+                label: value === 0 ? t('off') : String(value / 1000) + ' 秒',
+              })), poll, setPoll),
+              pick('page', t('pageLabel'), t('pageDesc'), PREFS_PAGE.map((value) => ({
+                value: String(value),
+                label: String(value),
+              })), page, setPage),
+              item('uncommitted', t('uncommittedLabel'), t('uncommittedDesc'),
+                E(SettingSwitch, { on: showUncommitted, onFlip: setShowUncommitted })),
+              item('discard', t('confirmDiscardLabel'), t('confirmDiscardDesc'),
+                E(SettingSwitch, { on: confirmDiscard, onFlip: setConfirmDiscard })))),
           E('div', { className: 'gw-card-foot' },
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: props.onOpenPluginSettings,
+            }, t('openPluginSettings')),
+            E('span', { className: 'gw-spacer' }),
             E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, t('cancel')),
             E('button', {
               className: 'gw-btn gw-btn-primary gw-btn-sm',
-              onClick: () => props.onSave({ poll: poll, page: page }),
+              onClick: () => props.onSave({
+                poll: poll, page: page,
+                showUncommitted: showUncommitted, confirmDiscard: confirmDiscard,
+              }),
             }, t('save')))))
     }
 
@@ -1986,6 +2060,33 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
       const [prefs, setPrefs] = useState(() => loadPrefs(cwd))
+      /* 插件详情页里的设置是权威值；本地那份只当会话级覆盖。用户没在本地改过，
+         就用插件设置里的每页条数与刷新间隔。 */
+      useEffect(() => {
+        if (cwd === '') return undefined
+        let alive = true
+        void (async () => {
+          try {
+            const data = await api('settings', {})
+            if (alive === false || data === null || data === undefined) return
+            let stored = false
+            try {
+              stored = globalThis.localStorage !== undefined
+                && globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+            } catch (error) {
+              void error
+            }
+            if (stored === true) return
+            setPrefs({
+              poll: typeof data.pollMs === 'number' ? data.pollMs : 3000,
+              page: typeof data.pageSize === 'number' ? data.pageSize : 100,
+            })
+          } catch (failure) {
+            void failure
+          }
+        })()
+        return () => { alive = false }
+      }, [cwd])
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
@@ -2231,7 +2332,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       }, [cwd, run, refreshSummary])
 
       const doDiscard = useCallback((item) => {
-        const ok = window.confirm(t('discardConfirm', { path: item.path }))
+        const ok = prefs.confirmDiscard === false || window.confirm(t('discardConfirm', { path: item.path }))
         if (!ok) return
         void run(async () => {
           await api('discard', { cwd: cwd, paths: [item.path], confirm: true })
@@ -2241,7 +2342,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const doDiscardAll = useCallback((items) => {
         if (items.length === 0) return
-        const ok = window.confirm(t('discardAllConfirm', { count: String(items.length) }))
+        const ok = prefs.confirmDiscard === false || window.confirm(t('discardAllConfirm', { count: String(items.length) }))
         if (!ok) return
         void run(async () => {
           await api('discard', { cwd: cwd, paths: items.map((item) => item.path), confirm: true })
@@ -2417,7 +2518,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const changeTotal = conflicted.length + staged.length + unstaged.length + untracked.length
       const headHash = summary === null || summary.head === undefined ? null : summary.head
       const allEntries = useMemo(() => {
-        if (changeTotal === 0) return entries
+        if (changeTotal === 0 || prefs.showUncommitted === false) return entries
         return [{
           hash: UNCOMMITTED_HASH,
           short: '',
@@ -2428,7 +2529,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           subject: t('uncommitted') + ' (' + String(changeTotal) + ')',
           uncommitted: true,
         }].concat(entries)
-      }, [entries, changeTotal, headHash, t])
+      }, [entries, changeTotal, headHash, t, prefs.showUncommitted])
 
       /* 聚焦只留当前分支这一条第一父链，其余提交收起来；全览原样显示。 */
       const rowEntries = useMemo(() => {
@@ -3003,6 +3104,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settingsOpen === false ? null : E(SettingsDialog, {
           t: t,
           prefs: prefs,
+          onOpenPluginSettings: () => { setSettingsOpen(false); openPluginSettings() },
           onClose: () => setSettingsOpen(false),
           onSave: (next) => {
             setPrefs(next)
