@@ -1,11 +1,11 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-git-workbench',
+  id: 'dsh-git-graph',
   factory: (require) => {
     const React = require('react')
     const E = React.createElement
     const { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } = React
 
-    const PKG = 'dsh-git-workbench'
+    const PKG = 'dsh-git-graph'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
 /* Git 输出页的筛选档位，与 VSCode 的日志级别对齐。 */
@@ -2336,7 +2336,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           ? 'files:worktree:' + ref.path + ':' + String(ref.staged)
           : 'files:commit:' + ref.hashFull + ':' + ref.path
         try {
-          service.openTab({ type: 'git-workbench-files', id: key, title: title, meta: meta }, scope)
+          service.openTab({ type: 'git-graph-files', id: key, title: title, meta: meta }, scope)
           return true
         } catch (failure) {
           void failure
@@ -2440,7 +2440,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         if (service === undefined || service === null || typeof service.openTab !== 'function') return
         try {
           service.openTab({
-            type: 'git-workbench-files',
+            type: 'git-graph-files',
             id: 'files:' + group,
             title: t('filesTabTitle') + ' · ' + String(paths.length),
             meta: { cwd: cwd, paths: paths, staged: group === 'staged' },
@@ -3365,7 +3365,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         tabCtx.effect(() => {
           const t = translatorOf(tabCtx)
           const off = betterSidebar.registerTab({
-            id: 'git-workbench',
+            id: 'git-graph',
             title: () => t('title'),
             description: () => t('description'),
             icon: (size) => E(TabIcon, { size: size }),
@@ -3376,7 +3376,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           /* 批量差异标签：一个分组下所有文件放一起看，从分组标题打开，
              所以不出现在新建标签的菜单里，也可以同时开好几个。 */
           const offFiles = betterSidebar.registerTab({
-            id: 'git-workbench-files',
+            id: 'git-graph-files',
             title: () => t('filesTabTitle'),
             icon: (size) => E('svg', {
               width: size === undefined ? 14 : size,
@@ -3402,7 +3402,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             if (typeof offFiles === 'function') offFiles()
             if (typeof offOutput === 'function') offOutput()
           }
-        }, 'dsh-git-workbench: sidebar tab')
+        }, 'dsh-git-graph: sidebar tab')
       })
     }
 
