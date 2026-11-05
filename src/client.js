@@ -2345,7 +2345,6 @@ window.__ModuleLoader__.load({
           leaf ? null : E('div', { className: 'gw-menu-sub' },
             kids.map((kid, index) => E('div', { key: 's' + String(index), className: 'gw-menu-item' }, kid))))
       }
-      const subMenu = (label, children) => menuRow(label, null, children)
 
       if (cwd === '') {
         return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
@@ -2641,23 +2640,16 @@ window.__ModuleLoader__.load({
             className: 'gw-menu',
             style: { top: morePos.top + 'px', right: morePos.right + 'px' },
           },
-            menuRow(t('fetchAll'), () => { setMoreOpen(false); doSync('fetchAll') }),
-            E('div', { className: 'gw-menu-sep' }),
-            menuRow(t('pull'), () => { setMoreOpen(false); doSync('pull') }),
-            menuRow(t('push'), () => { setMoreOpen(false); doSync('push') }),
-            menuRow(t('clone'), null, [t('cloneUrl'), t('cloneTo')]),
-            menuRow(t('checkoutTo'), null, [t('checkoutBranch'), t('checkoutTag')]),
-            menuRow(t('fetch'), () => { setMoreOpen(false); doSync('fetchAll') }),
-            E('div', { className: 'gw-menu-sep' }),
-            subMenu(t('commitGroup'), [t('commitStaged'), t('commitAll'), t('amendLast'), t('undoLastCommit')]),
-            subMenu(t('changesGroup'), [t('stageAllChanges'), t('unstageAllChanges'), t('discardAllChanges')]),
-            subMenu(t('syncGroup'), [t('pullThenPush')]),
-            subMenu(t('branchesGroup'), [t('createBranchItem'), t('deleteBranchItem'), t('renameBranchItem')]),
-            subMenu(t('remotesGroup'), [t('addRemoteItem'), t('removeRemoteItem'), t('editRemoteItem')]),
-            subMenu(t('stashGroup'), [t('stashSaveItem'), t('stashApplyItem'), t('stashDropItem')]),
-            subMenu(t('tagsGroup'), [t('tagCreateItem'), t('tagDeleteItem')]),
-            E('div', { className: 'gw-menu-sep' }),
-            menuRow(t('showOutput'), null, [t('openInTerminal')]))),
+            menuRow(t('remotes'), () => { setMoreOpen(false); setRemoteOpen(true) }),
+            menuRow(t('openInTerminal'), () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('openInTerminal'),
+                message: 'cd ' + JSON.stringify(cwd),
+                confirmLabel: t('close'),
+                onOk: () => {},
+              })
+            }))),
         ask === null ? null : E(AskDialog, {
           t: t,
           title: ask.title,
