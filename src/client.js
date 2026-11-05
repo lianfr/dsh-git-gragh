@@ -2669,8 +2669,16 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const head = E('div', { className: 'gw-graph-head' },
         E('span', { className: 'gw-branch' },
-          E('svg', { width: 12, height: 12, viewBox: '0 0 16 16', fill: 'currentColor' },
-            E('path', { d: 'M5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 1.2a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM5 6v4a2 2 0 1 0 .9 1.66V6H5zm0 6.4a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM10.5 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 1.2a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM10.5 6c1.4 0 2.5 1.1 2.5 2.5S11.9 11 10.5 11H8a1 1 0 0 0-1 1v1h1v-1h2.5C12.4 12 14 10.4 14 8.5S12.4 5 10.5 5V6z' })),
+          E('svg', {
+            width: 12, height: 12, viewBox: '0 0 16 16',
+            fill: 'none', stroke: 'currentColor', strokeWidth: 1.3,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          },
+            E('path', { key: 'trunk', d: 'M4.6 5.2v5.6' }),
+            E('path', { key: 'fork', d: 'M4.6 10.8h4.2a1.6 1.6 0 0 0 1.6-1.6V7.4' }),
+            E('circle', { key: 'a', cx: 4.6, cy: 3.6, r: 1.5 }),
+            E('circle', { key: 'b', cx: 4.6, cy: 12.4, r: 1.5 }),
+            E('circle', { key: 'c', cx: 10.4, cy: 6, r: 1.5 })),
           summary === null || summary.branch === null || summary.branch === undefined
             ? (summary !== null && summary.empty === true ? t('noCommits') : t('unknown'))
             : (summary.detached === true ? 'HEAD@' + String(summary.branch).slice(0, 7) : summary.branch)),
