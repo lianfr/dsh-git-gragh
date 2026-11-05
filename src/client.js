@@ -542,6 +542,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     const DICT = {
       zh: {
         title: 'Git',
+        rightbarDesc: '在右侧栏里查看提交图、管理更改与提交',
         description: '提交图与变更管理',
         commitPlaceholder: '写点提交信息…',
         commit: '提交',
@@ -697,6 +698,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       },
       en: {
         title: 'Git',
+        rightbarDesc: 'Review the commit graph and manage changes in the right sidebar',
         description: 'Commit graph and changes',
         commitPlaceholder: 'Commit message',
         commit: 'Commit',
@@ -3449,37 +3451,32 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
     function RightbarBody(props) {
       const ctx = props.ctx
-      const [sessionId, setSessionId] = useState('')
-      useEffect(() => {
-        if (ctx === undefined || ctx === null) return undefined
-        const controller = ctx.get('sidebarRight')
-        const mounted = controller === undefined || controller === null ? undefined : controller.mounted
-        if (mounted === undefined || mounted === null || typeof mounted.getSnapshot !== 'function') return undefined
-        const read = () => {
-          let value = ''
-          try {
-            value = mounted.getSnapshot()
-          } catch (error) {
-            void error
+      const sessionId = typeof props.sessionId === 'string' ? props.sessionId : ''
+      const workspaces = typeof props.useWorkspaces === 'function'
+        ? props.useWorkspaces((state) => state.items) : null
+      let cwd = ''
+      if (sessionId !== '') {
+        const found = sessionCwdOf(ctx, sessionId)
+        if (found !== undefined) cwd = found
+      }
+      if (cwd === '' && Array.isArray(workspaces)) {
+        for (let i = 0; i < workspaces.length; i += 1) {
+          const item = workspaces[i]
+          if (item === null || typeof item !== 'object') continue
+          if (!Array.isArray(item.sessionIds) || item.sessionIds.indexOf(sessionId) < 0) continue
+          if (typeof item.path === 'string' && item.path !== '') {
+            cwd = item.path
+            break
           }
-          setSessionId(typeof value === 'string' ? value : '')
         }
-        read()
-        const handle = typeof mounted.subscribe === 'function' ? mounted.subscribe(read) : undefined
-        return () => {
-          if (typeof handle === 'function') handle()
-        }
-      }, [ctx])
-      if (sessionId === '') {
+      }
+      if (cwd === '') {
         const t = ctx === undefined || ctx === null ? (key) => key : translatorOf(ctx)
         return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
       }
-      return E(GitPanel, { ctx: ctx, scope: { sessionId: sessionId }, visible: true })
+      return E(GitPanel, { ctx: ctx, scope: { sessionId: sessionId, cwd: cwd }, visible: true })
     }
 
-    function RightbarTitle(props) {
-      return E('span', { className: 'gw-rightbar-title' }, props.t('title'))
-    }
 
     function apply(ctx) {
       injectStyles()
@@ -3530,32 +3527,43 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       })
 
       /* 右侧栏入口：走宿主自带的 sidebar-right，与 better-sidebar 无关。
-         tab 类型注册后它自己会出现在「更多工具」列表里，不需要额外按钮。 */
-      ctx.inject(['slots'], (slotCtx) => {
-        slotCtx.effect(() => {
-          const t = translatorOf(slotCtx)
-          const disposers = []
-          const tabs = slotCtx.get('sidebarRightTabs')
-          if (tabs !== undefined && tabs !== null && typeof tabs.register === 'function') {
-            disposers.push(tabs.register({
-              id: RIGHTBAR_ID,
-              kind: RIGHTBAR_KIND,
+         两个依赖必须写进 inject——不写的话 inject 回调会在服务还没就绪时执行，
+         get 拿到 undefined，整块注册静默退出（这也是「更多工具」里什么都看不到的原因）。 */
+      ctx.inject(['sidebarRightTabs', 'slots'], (rightCtx) => {
+        const tabs = rightCtx.get('sidebarRightTabs')
+        const slots = rightCtx.get('slots')
+        if (tabs === undefined || typeof tabs.register !== 'function') return
+        if (slots === undefined || typeof slots.inject !== 'function') return
+        rightCtx.effect(() => {
+          const t = translatorOf(rightCtx)
+          const offType = tabs.register({
+            id: RIGHTBAR_ID,
+            kind: RIGHTBAR_KIND,
+            title: () => t('title'),
+            guide: [{
+              id: 'git-graph',
+              order: 30,
               title: () => t('title'),
-            }))
-          }
-          disposers.push(slotCtx.slots.inject('sidebar.right.pane.tab', () => slotCtx.slots.register({
-            name: 'sidebar.right.pane.tab',
-            key: RIGHTBAR_ID,
-            inject: () => ({ ctx: slotCtx, t: t }),
-          }, RightbarBody)))
-          disposers.push(slotCtx.slots.inject('sidebar.right.pane.tab.title', () => slotCtx.slots.register({
-            name: 'sidebar.right.pane.tab.title',
-            key: RIGHTBAR_ID,
-            inject: () => ({ t: t }),
-          }, RightbarTitle)))
+              description: () => t('rightbarDesc'),
+              icon: (iconProps) => E(TabIcon, {
+                size: iconProps === undefined || iconProps.size === undefined ? 16 : iconProps.size,
+              }),
+            }],
+          })
+          const offBody = slots.inject('sidebar.right.pane.tab', () => slots.register(
+            { name: 'sidebar.right.pane.tab', key: RIGHTBAR_ID },
+            (tabProps) => E(RightbarBody, Object.assign({}, tabProps, { ctx: ctx, t: t })),
+          ))
           return () => {
-            for (let i = disposers.length - 1; i >= 0; i -= 1) {
-              if (typeof disposers[i] === 'function') disposers[i]()
+            try {
+              offBody()
+            } catch (error) {
+              void error
+            }
+            try {
+              offType()
+            } catch (error) {
+              void error
             }
           }
         }, 'dsh-git-graph: 右侧栏')
