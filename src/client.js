@@ -1375,6 +1375,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         className: cls,
         style: { '--gw-ref-fill': chain },
         title: pick === undefined ? label : label + ' · ' + props.pickHint,
+        /* 标签自己吃掉单击，否则会冒泡到行上把详情抽屉打开；双击仍然检出。 */
+        onClick: (event) => event.stopPropagation(),
         onDoubleClick: pick,
       },
         E('span', { className: 'gw-ref-flag' }),
