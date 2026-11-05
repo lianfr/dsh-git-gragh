@@ -566,13 +566,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settings: '设置',
         openPluginSettings: '打开插件设置',
         pollLabel: '自动刷新',
-    pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
-    pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
-    uncommittedLabel: '显示未提交的更改',
-    uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
-    confirmDiscardLabel: '撤销前确认',
-    confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
+        pollDesc: '面板在后台检查仓库变化的间隔，设为关闭就不再自动刷新。',
+        pageDesc: '提交图一次拉取多少条，翻到底再加载下一页。',
+        uncommittedLabel: '显示未提交的更改',
+        uncommittedDesc: '工作区有改动时，在提交图最上面单独画一行。',
+        confirmDiscardLabel: '撤销前确认',
+        confirmDiscardDesc: '撤销更改、重置这类不可撤销的操作，执行前先问一次。',
     showUncommitted: '显示未提交的更改',
+        seconds: '{n} 秒',
         pageLabel: '每页条数',
         off: '关闭',
         clone: '克隆…',
@@ -720,13 +721,14 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settings: 'Settings',
         openPluginSettings: 'Open plugin settings',
         pollLabel: 'Auto refresh',
-      pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
-      pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
-      uncommittedLabel: 'Show uncommitted changes',
-      uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
-      confirmDiscardLabel: 'Confirm before discarding',
-      confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
+        pollDesc: 'How often the panel checks the repository in the background. Turn it off to stop polling.',
+        pageDesc: 'How many commits to load at a time; scrolling to the end loads the next page.',
+        uncommittedLabel: 'Show uncommitted changes',
+        uncommittedDesc: 'Draw uncommitted work as its own row above the graph.',
+        confirmDiscardLabel: 'Confirm before discarding',
+        confirmDiscardDesc: 'Ask before discarding changes or resetting, since those cannot be undone.',
       showUncommitted: 'Show uncommitted changes',
+        seconds: '{n} seconds',
         pageLabel: 'Rows per page',
         off: 'Off',
         clone: 'Clone…',
@@ -877,6 +879,17 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         }
         return text
       }
+    }
+
+    /* 语言一变就重渲染：locale 服务的 subscribe 在切换语言和注册字典时都会回调。 */
+    function useLocaleRevision(ctx) {
+      const [revision, setRevision] = useState(0)
+      useEffect(() => {
+        const locale = ctx === undefined || ctx === null ? undefined : ctx.get('locale')
+        if (locale === undefined || locale === null || typeof locale.subscribe !== 'function') return undefined
+        return locale.subscribe(() => setRevision((value) => value + 1))
+      }, [ctx])
+      return revision
     }
 
     /* ------------------------------------------------------------------ */
@@ -1560,7 +1573,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             E('div', { className: 'gw-set-list' },
               pick('poll', t('pollLabel'), t('pollDesc'), PREFS_POLL.map((value) => ({
                 value: String(value),
-                label: value === 0 ? t('off') : String(value / 1000) + ' 秒',
+                label: value === 0 ? t('off') : t('seconds', { n: value / 1000 }),
               })), poll, setPoll),
               pick('page', t('pageLabel'), t('pageDesc'), PREFS_PAGE.map((value) => ({
                 value: String(value),
@@ -2099,6 +2112,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     /* ------------------------------------------------------------------ */
 
     function GitPanel(props) {
+      useLocaleRevision(props.ctx)
       const ctx = props.ctx
       const t = translatorOf(ctx)
       const scope = props.scope !== undefined && props.scope !== null ? props.scope : {}
@@ -3273,8 +3287,9 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
      * 侧边栏自带的 diff 标签只认单个文件或整次提交，这一组得自己画。
      */
     function FilesTab(props) {
-      const t = props.t
       const ctx = props.ctx
+      const t = translatorOf(ctx)
+      useLocaleRevision(ctx)
       const scope = props.scope
       const tab = props.tab
       const meta = tab === undefined || tab === null || tab.meta === undefined || tab.meta === null ? {} : tab.meta
