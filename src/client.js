@@ -429,7 +429,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   border:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent);
   box-shadow:0 6px 18px rgba(0,0,0,.16); pointer-events:auto;
   display:flex; align-items:center; gap:8px;
-  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 3.6s forwards; }
+  animation:gw-err-in .2s cubic-bezier(.2,.8,.3,1) both, gw-err-out .42s ease 3.1s forwards; }
 .gw-err-text { flex:1 1 auto; min-width:0; }
 .gw-err-close { flex:none; display:flex; align-items:center; justify-content:center;
   width:16px; height:16px; padding:0; border:none; border-radius:50%; background:transparent;
@@ -2111,6 +2111,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       const [hasMore, setHasMore] = useState(false)
       const [loadingMore, setLoadingMore] = useState(false)
       const [error, setError] = useState(null)
+      const errorSeq = useRef(0)
+      const errorTimer = useRef(null)
       const [busy, setBusy] = useState(false)
       const [message, setMessage] = useState('')
       const [amend, setAmend] = useState(false)
@@ -2174,20 +2176,45 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         return () => { aliveRef.current = false }
       }, [])
 
-      const refreshSummary = useCallback(async () => {
+      /* 错误只留一条：新错误直接顶掉旧的，并且统一由这里管计时退场，
+         免得轮询每几秒重设一次、把计时器一直往后推，看起来就永远不消失。 */
+      const showError = useCallback((text) => {
+        errorSeq.current += 1
+        setError({ id: errorSeq.current, text: text })
+        if (errorTimer.current !== null) clearTimeout(errorTimer.current)
+        errorTimer.current = setTimeout(() => {
+          errorTimer.current = null
+          if (aliveRef.current) clearError()
+        }, 3600)
+      }, [])
+
+      const clearError = useCallback(() => {
+        if (errorTimer.current !== null) {
+          clearTimeout(errorTimer.current)
+          errorTimer.current = null
+        }
+        setError(null)
+      }, [])
+
+      useEffect(() => () => {
+        if (errorTimer.current !== null) clearTimeout(errorTimer.current)
+      }, [])
+
+      const refreshSummary = useCallback(async (quiet) => {
         if (cwd === '') return null
         try {
           const data = await api('summary', { cwd: cwd })
           if (aliveRef.current) {
             setSummary(data)
-            setError(null)
+            if (quiet !== true) clearError()
           }
           return data
         } catch (failure) {
-          if (aliveRef.current) setError(failure.message)
+          /* 后台轮询失败保持安静：用户没动手，就别反复往他眼前推提示。 */
+          if (aliveRef.current && quiet !== true) showError(failure.message)
           return null
         }
-      }, [cwd])
+      }, [cwd, clearError, showError])
 
       const captureAnchor = () => {
         const node = bodyRef.current
@@ -2213,9 +2240,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           consumedRef.current = typeof data.consumed === 'number' ? data.consumed : 0
           setEntries(Array.isArray(data.entries) ? data.entries : [])
           setHasMore(data.hasMore === true)
-          setError(null)
         } catch (failure) {
-          if (aliveRef.current) setError(failure.message)
+          if (aliveRef.current) showError(failure.message)
         }
       }, [cwd])
 
@@ -2244,7 +2270,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         let stopped = false
         const timer = setInterval(async () => {
           if (stopped) return
-          const view = await refreshSummary()
+          const view = await refreshSummary(true)
           if (stopped || view === null) return
           const signature = signatureOf(view)
           if (signature === lastSigRef.current) return
@@ -2267,7 +2293,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           setEntries((prev) => prev.concat(next))
           setHasMore(data.hasMore === true)
         } catch (failure) {
-          if (aliveRef.current) setError(failure.message)
+          if (aliveRef.current) showError(failure.message)
         } finally {
           if (aliveRef.current) setLoadingMore(false)
         }
@@ -2280,7 +2306,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const run = useCallback(async (fn) => {
         setBusy(true)
-        setError(null)
+        clearError()
         try {
           await fn()
         } catch (failure) {
@@ -2302,7 +2328,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
           const data = await api('commitDetail', { cwd: cwd, hash: entry.hash })
           if (aliveRef.current && data !== null) setDetail(data)
         } catch (failure) {
-          if (aliveRef.current) setError(failure.message)
+          if (aliveRef.current) showError(failure.message)
         }
       }, [selected, cwd])
 
@@ -2474,7 +2500,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
         if (error === null) return undefined
-        const timer = setTimeout(() => { if (aliveRef.current) setError(null) }, 4100)
+        const timer = setTimeout(() => { if (aliveRef.current) clearError() }, 4100)
         return () => clearTimeout(timer)
       }, [error])
 
@@ -2536,7 +2562,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
 
       const doCommit = useCallback(() => {
-        if (message.trim() === '' && amend === false) { setError(t('emptyMsg')); return }
+        if (message.trim() === '' && amend === false) { showError(t('emptyMsg')); return }
         void run(async () => {
           await api('commit', { cwd: cwd, message: message, amend: amend })
           setMessage('')
@@ -2897,12 +2923,12 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const top = E('div', { className: 'gw-top' },
         E('div', { className: 'gw-pad' },
-          error === null ? null : E('div', { className: 'gw-err', key: error },
-            E('span', { className: 'gw-err-text' }, error),
+          error === null ? null : E('div', { className: 'gw-err', key: error.id },
+            E('span', { className: 'gw-err-text' }, error.text),
             E('button', {
               className: 'gw-err-close',
               'aria-label': t('close'),
-              onClick: () => setError(null),
+              onClick: () => clearError(),
             }, '×')),
           changeBar,
           E('textarea', {
