@@ -13,6 +13,7 @@
  */
 
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 
 import { GitError, gitExecutable, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
