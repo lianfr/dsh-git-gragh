@@ -274,6 +274,11 @@ window.__ModuleLoader__.load({
 .gw-diff-del { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent); }
 .gw-diff-hunk { color:var(--dsw-alias-label-tertiary); background:var(--dsw-alias-bg-layer-2); }
 .gw-diff-add .gw-diff-text, .gw-diff-del .gw-diff-text { color:var(--dsw-alias-label-primary); }
+.gw-tok-com { color:var(--dsw-alias-label-tertiary); font-style:italic; }
+.gw-tok-str { color:color-mix(in srgb, var(--dsw-alias-state-success-primary) 62%, var(--dsw-alias-label-primary)); }
+.gw-tok-num { color:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 58%, var(--dsw-alias-label-primary)); }
+.gw-tok-key { color:color-mix(in srgb, var(--dsw-alias-state-business-primary) 62%, var(--dsw-alias-label-primary)); }
+.gw-tok-fn { color:color-mix(in srgb, var(--dsw-alias-brand-primary) 62%, var(--dsw-alias-label-primary)); }
 
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
 /* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
@@ -951,12 +956,90 @@ window.__ModuleLoader__.load({
       return 'gw-code gw-code-idx'
     }
 
+    /* 轻量着色：只认注释、字符串、数字、关键字、函数名，够分辨就行，不做真正的语法解析。 */
+    const HL_KEYWORDS = new Set([
+      'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while',
+      'class', 'new', 'import', 'export', 'from', 'await', 'async', 'try', 'catch',
+      'finally', 'throw', 'typeof', 'instanceof', 'extends', 'implements', 'interface',
+      'type', 'enum', 'public', 'private', 'protected', 'static', 'readonly', 'def',
+      'null', 'undefined', 'true', 'false', 'this', 'super', 'in', 'of', 'do',
+      'switch', 'case', 'default', 'break', 'continue', 'delete', 'void', 'yield',
+      'as', 'is', 'and', 'or', 'not', 'elif', 'lambda', 'pass', 'raise', 'with',
+    ])
+
+    function highlightLine(text, state) {
+      const parts = []
+      let plain = ''
+      let index = 0
+      const flush = () => {
+        if (plain !== '') { parts.push({ text: plain, cls: '' }); plain = '' }
+      }
+      const push = (value, cls) => { flush(); parts.push({ text: value, cls: cls }) }
+
+      while (index < text.length) {
+        if (state.block === true) {
+          const end = text.indexOf('*/', index)
+          if (end < 0) { push(text.slice(index), 'gw-tok-com'); index = text.length; break }
+          push(text.slice(index, end + 2), 'gw-tok-com')
+          index = end + 2
+          state.block = false
+          continue
+        }
+        const rest = text.slice(index)
+        if (rest.startsWith('//') || (rest.startsWith('#') && (index === 0 || /\s/.test(text[index - 1])))) {
+          push(rest, 'gw-tok-com')
+          break
+        }
+        if (rest.startsWith('/*')) {
+          const end = text.indexOf('*/', index + 2)
+          if (end < 0) { push(rest, 'gw-tok-com'); state.block = true; break }
+          push(text.slice(index, end + 2), 'gw-tok-com')
+          index = end + 2
+          continue
+        }
+        const first = text[index]
+        if (first === '"' || first === "'" || first === '`') {
+          let cursor = index + 1
+          while (cursor < text.length) {
+            if (text[cursor] === '\\') { cursor += 2; continue }
+            if (text[cursor] === first) { cursor += 1; break }
+            cursor += 1
+          }
+          push(text.slice(index, cursor), 'gw-tok-str')
+          index = cursor
+          continue
+        }
+        if (/[0-9]/.test(first) && (index === 0 || /[^A-Za-z0-9_$]/.test(text[index - 1]))) {
+          const match = /^[0-9][0-9a-zA-Z_.]*/.exec(rest)
+          push(match[0], 'gw-tok-num')
+          index += match[0].length
+          continue
+        }
+        if (/[A-Za-z_$]/.test(first)) {
+          const match = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(rest)
+          const word = match[0]
+          const after = text[index + word.length]
+          if (HL_KEYWORDS.has(word)) push(word, 'gw-tok-key')
+          else if (after === '(') push(word, 'gw-tok-fn')
+          else plain += word
+          index += word.length
+          continue
+        }
+        plain += first
+        index += 1
+      }
+      flush()
+      return parts
+    }
+
     function splitDiff(text) {
       const rows = []
       const lines = String(text === null || text === undefined ? '' : text).split('\n')
       let oldNo = 0
       let newNo = 0
       let inHunk = false
+      /* 跨行注释要连续着色，所以状态在整篇里共用一份。 */
+      const hlState = { block: false }
       for (const line of lines) {
         /* 文件头那一堆（diff --git、index、---、+++、mode 之类）在单文件视图里
            是重复信息，文件路径已经在标签页标题上了，全部丢掉。 */
@@ -978,10 +1061,11 @@ window.__ModuleLoader__.load({
           continue
         }
         /* 增删符号单独成列，正文从第二个字符开始，不再挤在内容里。 */
-        if (line.startsWith('+')) { rows.push({ type: 'add', sign: '+', text: line.slice(1), no: String(newNo) }); newNo += 1; continue }
-        if (line.startsWith('-')) { rows.push({ type: 'del', sign: '−', text: line.slice(1), no: String(oldNo) }); oldNo += 1; continue }
+        if (line.startsWith('+')) { const body = line.slice(1); rows.push({ type: 'add', sign: '+', text: body, tokens: highlightLine(body, hlState), no: String(newNo) }); newNo += 1; continue }
+        if (line.startsWith('-')) { const body = line.slice(1); rows.push({ type: 'del', sign: '−', text: body, tokens: highlightLine(body, hlState), no: String(oldNo) }); oldNo += 1; continue }
         if (line.startsWith('\\')) { rows.push({ type: 'meta', sign: '', text: line }); continue }
-        rows.push({ type: 'ctx', sign: '', text: line.slice(1), no: String(newNo) })
+        const body = line.slice(1)
+        rows.push({ type: 'ctx', sign: '', text: body, tokens: highlightLine(body, hlState), no: String(newNo) })
         oldNo += 1
         newNo += 1
       }
@@ -1406,7 +1490,12 @@ window.__ModuleLoader__.load({
           },
             E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
             E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
-            E('span', { className: 'gw-diff-text' }, row.text))
+            E('span', { className: 'gw-diff-text' },
+              row.tokens === undefined
+                ? row.text
+                : row.tokens.map((part, index2) => part.cls === ''
+                  ? part.text
+                  : E('span', { key: 't' + String(index2), className: part.cls }, part.text))))
         }))
     }
 
@@ -2671,8 +2760,9 @@ window.__ModuleLoader__.load({
             stroke: 'currentColor', strokeWidth: 1.3,
             strokeLinecap: 'round', strokeLinejoin: 'round',
           },
-            E('path', { d: 'M9.6 1.8H4.6a1.1 1.1 0 0 0-1.1 1.1v10.2a1.1 1.1 0 0 0 1.1 1.1h6.8a1.1 1.1 0 0 0 1.1-1.1V4.6z' }),
-            E('path', { d: 'M9.4 1.9v2.8h2.8' })),
+            E('rect', { x: 2.2, y: 2.2, width: 11.6, height: 11.6, rx: 2.8 }),
+            E('path', { d: 'M8 5.1v3.1M6.45 6.65h3.1' }),
+            E('path', { d: 'M6.45 10.6h3.1' })),
           String(paths.length) + ' ' + t('filesUnit')),
         E('span', { className: 'gw-spacer' }),
         E('button', {
@@ -2789,8 +2879,9 @@ window.__ModuleLoader__.load({
               viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
               strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
             },
-              E('path', { d: 'M9.6 1.8H4.6a1.1 1.1 0 0 0-1.1 1.1v10.2a1.1 1.1 0 0 0 1.1 1.1h6.8a1.1 1.1 0 0 0 1.1-1.1V4.6z' }),
-              E('path', { d: 'M9.4 1.9v2.8h2.8' })),
+              E('rect', { x: 2.2, y: 2.2, width: 11.6, height: 11.6, rx: 2.8 }),
+              E('path', { d: 'M8 5.1v3.1M6.45 6.65h3.1' }),
+              E('path', { d: 'M6.45 10.6h3.1' })),
             hidden: true,
             single: false,
             dedupeKey: (tab) => (tab === undefined || tab === null ? undefined : tab.id),
