@@ -37,12 +37,14 @@ export function gitExecutable() {
 }
 
 function remember(args, startedAt, value, quiet) {
-  const first = typeof args[0] === 'string' ? args[0] : ''
+  /* 记录本身绝不能让进程倒下：参数形状不对就退化成一条空命令。 */
+  const argv = Array.isArray(args) ? args : []
+  const first = typeof argv[0] === 'string' ? argv[0] : ''
   const category = READ_ONLY.has(first) ? 'repository' : 'git'
   const entry = {
     at: startedAt,
     ms: Date.now() - startedAt,
-    command: 'git ' + args.join(' '),
+    command: 'git ' + argv.join(' '),
     category: category,
     level: category === 'repository' ? 'debug' : 'info',
   }
@@ -169,7 +171,7 @@ export async function gitText(cwd, args, options) {
 export async function gitTextQuiet(cwd, args, options) {
   const quiet = Object.assign({}, options, { quiet: true })
   try {
-    return await gitText(cwd, quiet)
+    return await gitText(cwd, args, quiet)
   } catch (error) {
     void error
     return null
