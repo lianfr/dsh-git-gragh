@@ -123,11 +123,11 @@ window.__ModuleLoader__.load({
 .gw-output-row { display:flex; align-items:baseline; gap:12px; padding:5px 8px;
   border-radius:var(--dsw-radius-sm, 8px); color:var(--dsw-alias-label-secondary); }
 .gw-output-row:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
-.gw-output-time { flex:none; width:58px; color:var(--dsw-alias-label-tertiary);
+.gw-output-time { flex:none; width:62px; color:var(--dsw-alias-label-tertiary);
   font-variant-numeric:tabular-nums; }
 .gw-output-cmd { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; }
-.gw-output-ms { flex:none; width:52px; text-align:right; color:var(--dsw-alias-label-tertiary);
+.gw-output-ms { flex:none; width:62px; text-align:right; color:var(--dsw-alias-label-tertiary);
   font-variant-numeric:tabular-nums; }
 .gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
