@@ -94,9 +94,10 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-secondary); }
 .gw-group-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* 增删行数：平时不占视觉，悬停这一行才露出来 */
-.gw-file-stats { flex:none; display:flex; align-items:center; gap:6px; margin-left:8px;
-  font-size:10px; font-variant-numeric:tabular-nums; opacity:0;
-  transition:opacity .1s ease; }
+/* 文本 → 一段留白 → 「+n −m」，平时不显示，悬停这一行才浮现 */
+.gw-file-stats { flex:none; display:inline-flex; align-items:center; gap:8px; margin-left:10px;
+  font-size:10.5px; line-height:1; font-variant-numeric:tabular-nums;
+  opacity:0; transition:opacity .1s ease; }
 .gw-file:hover .gw-file-stats, .gw-group-head:hover .gw-file-stats { opacity:1; }
 .gw-stat-add { color:var(--dsw-alias-state-success-primary); }
 .gw-stat-del { color:var(--dsw-alias-state-error-primary); }
