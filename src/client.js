@@ -835,7 +835,23 @@ window.__ModuleLoader__.load({
         const parents = parentsOf(i)
         for (let p = 0; p < parents.length; p++) {
           const target = rowOfHash.get(parents[p])
-          if (target === undefined) continue
+          if (target === undefined) {
+            // 父提交还没加载进来：把线一路画到窗口末尾，别让它凭空断掉。
+            // 只画第一父，第二父断了会误导主线。
+            if (p === 0) {
+              edges.push({
+                from: i,
+                to: entries.length,
+                fromLane: rowLane[i],
+                toLane: rowLane[i],
+                fromColor: rowColor[i],
+                toColor: rowColor[i],
+                primary: true,
+                dangling: true,
+              })
+            }
+            continue
+          }
           edges.push({
             from: i,
             to: target,
@@ -2257,7 +2273,10 @@ window.__ModuleLoader__.load({
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
-                      const y2 = offsets.list[edge.to] + ROW_H / 2
+                      // 悬空的边走到最后一行下沿就停，不延伸出画布。
+                      const y2 = edge.dangling === true
+                        ? offsets.list[rowEntries.length - 1] + ROW_H
+                        : offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
                       let d
