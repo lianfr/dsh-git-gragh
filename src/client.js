@@ -269,11 +269,11 @@ window.__ModuleLoader__.load({
 .gw-diff-gutter { flex:none; width:40px; text-align:right; padding-right:8px; user-select:none;
   color:var(--dsw-alias-label-tertiary); }
 .gw-diff-text { flex:1 1 auto; padding-right:12px; }
-.gw-diff-add { background:var(--dsw-alias-file-diff-added-bg); }
-.gw-diff-del { background:var(--dsw-alias-file-diff-deleted-bg); }
+/* 底色压到很淡、文字保持默认前景色，向 VSCode 那种柔和观感靠拢 */
+.gw-diff-add { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 7%, transparent); }
+.gw-diff-del { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent); }
 .gw-diff-hunk { color:var(--dsw-alias-label-tertiary); background:var(--dsw-alias-bg-layer-2); }
-.gw-diff-add .gw-diff-text { color:var(--dsw-alias-state-success-primary); }
-.gw-diff-del .gw-diff-text { color:var(--dsw-alias-state-error-primary); }
+.gw-diff-add .gw-diff-text, .gw-diff-del .gw-diff-text { color:var(--dsw-alias-label-primary); }
 
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
 /* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
