@@ -93,6 +93,13 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   font-size:10px; font-weight:600; line-height:1;
   background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-secondary); }
 .gw-group-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* 增删行数：平时不占视觉，悬停这一行才露出来 */
+.gw-file-stats { flex:none; display:flex; align-items:center; gap:6px; margin-left:8px;
+  font-size:10px; font-variant-numeric:tabular-nums; opacity:0;
+  transition:opacity .1s ease; }
+.gw-file:hover .gw-file-stats, .gw-group-head:hover .gw-file-stats { opacity:1; }
+.gw-stat-add { color:var(--dsw-alias-state-success-primary); }
+.gw-stat-del { color:var(--dsw-alias-state-error-primary); }
 .gw-group-actions { flex:none; display:flex; align-items:center; gap:2px; }
 .gw-group-head { display:flex; align-items:center; gap:4px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
@@ -1676,6 +1683,9 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         E('span', { className: 'gw-file-name' },
           parts.dir === '' ? null : E('span', { className: 'gw-file-dir' }, parts.dir),
           parts.name),
+        E('span', { className: 'gw-file-stats' },
+          E('span', { className: 'gw-stat-add' }, '+' + String(item.added === undefined ? 0 : item.added)),
+          E('span', { className: 'gw-stat-del' }, '−' + String(item.deleted === undefined ? 0 : item.deleted))),
 
         E('span', { className: 'gw-file-actions' },
           E(ActionIcon, { name: 'open', title: t('openFile'), onClick: () => props.onOpenEditor(item) }),
@@ -1776,12 +1786,20 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     }
 
     function ChangeGroup(props) {
+      const items = props.items === undefined || props.items === null ? [] : props.items
+      const total = items.reduce((acc, item) => {
+        acc.added += item.added === undefined ? 0 : item.added
+        acc.deleted += item.deleted === undefined ? 0 : item.deleted
+        return acc
+      }, { added: 0, deleted: 0 })
       const t = props.t
-      const items = props.items
       return E('div', null,
         E('div', { className: 'gw-group-head', onClick: props.onToggle },
           E(Caret, { open: props.open === true }),
           E('span', { className: 'gw-group-title' }, props.title),
+          E('span', { className: 'gw-file-stats' },
+            E('span', { className: 'gw-stat-add' }, '+' + String(total.added)),
+            E('span', { className: 'gw-stat-del' }, '−' + String(total.deleted))),
           E('span', { className: 'gw-spacer' }),
           E('span', { className: 'gw-group-actions' },
             props.action === undefined || props.action === null ? null : props.action),
