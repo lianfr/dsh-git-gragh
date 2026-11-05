@@ -286,7 +286,8 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
 .gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
-.gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
+/* 不用 opacity 表示禁用：父元素的透明度会连 ::after 的提示框一起变半透明。 */
+.gw-icon:disabled { color:color-mix(in srgb, var(--dsw-alias-label-tertiary) 42%, transparent); cursor:default; background:transparent; }
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:3px 7px; border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
