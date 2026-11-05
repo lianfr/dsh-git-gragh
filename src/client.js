@@ -1187,7 +1187,7 @@ window.__ModuleLoader__.load({
       const open = props.collapsed.has(node.path) === false
       return E('div', null,
         E('div', {
-          className: 'gw-row gw-tree-dir',
+          className: 'gw-file gw-tree-dir',
           style: pad,
           onClick: () => props.onToggleDir(node.path),
         },
