@@ -3446,7 +3446,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
     /* 右侧栏：不依赖 better-sidebar 的那条路。注册一种 tab 类型，它会出现在
        右侧栏的「更多工具」里，点开就在右侧栏显示；better-sidebar 在时它自己
        那条注册也照旧，两边互不影响。 */
-    const RIGHTBAR_KIND = 'git-graph'
+    const RIGHTBAR_KIND = 'git-graph-panel'
     const RIGHTBAR_ID = 'dsh-git-graph/rightbar'
 
     function RightbarBody(props) {
@@ -3535,6 +3535,11 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         if (tabs === undefined || typeof tabs.register !== 'function') return
         if (slots === undefined || typeof slots.inject !== 'function') return
         rightCtx.effect(() => {
+          /* better-sidebar 会把它的每个 tab 也注册成原生右侧栏的 kind，用的就是 tab id。
+             它在的时候自己就把 Git 挂上去了，这里再注册一遍会在「开始」页多出一张卡片，
+             而且 kind 撞车会直接报错——所以它在就让位。 */
+          const native = rightCtx.get('betterSidebar')
+          if (native !== undefined) return undefined
           const t = translatorOf(rightCtx)
           const offType = tabs.register({
             id: RIGHTBAR_ID,
