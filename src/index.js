@@ -64,6 +64,9 @@ export const Config = Schema === null ? undefined : Schema.object({
 /* apply 收到的行内配置。写进这里，settings 方法再原样吐给客户端，
    于是面板与插件详情页读的是同一份值，不用两边各存一套。 */
 let currentConfig = {}
+/* 配置每变一次就加一。前端拿它判断详情页的设置是不是刚被改过，
+   改过就把本地的临时覆盖让出来，否则用户在详情页改了却看不到反应。 */
+let configRevision = 1
 
 const ROUTE_PREFIX = '/dsh-git-graph/api'
 const LOG_FORMAT = ['%H', '%h', '%P', '%an', '%ae', '%at', '%D', '%s'].join(LOG_FIELD) + LOG_RECORD
@@ -298,6 +301,7 @@ function settings() {
     pollMs: typeof currentConfig.pollMs === 'number' ? currentConfig.pollMs : 3000,
     showUncommitted: currentConfig.showUncommitted !== false,
     confirmDiscard: currentConfig.confirmDiscard !== false,
+    revision: configRevision,
   }
 }
 
@@ -795,6 +799,7 @@ async function handle(req, res) {
 
 export function apply(ctx, config) {
   currentConfig = config === undefined || config === null ? {} : config
+  configRevision += 1
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: handle }),
     'dsh-git-graph: /dsh-git-graph/api git 路由',

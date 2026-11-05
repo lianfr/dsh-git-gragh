@@ -2172,16 +2172,32 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             const data = await api('settings', {})
             if (alive === false || data === null || data === undefined) return
             let stored = false
+            let seen = -1
             try {
-              stored = globalThis.localStorage !== undefined
-                && globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+              if (globalThis.localStorage !== undefined) {
+                stored = globalThis.localStorage.getItem('gw-prefs:' + cwd) !== null
+                const raw = globalThis.localStorage.getItem('gw-cfg-rev:' + cwd)
+                seen = raw === null ? -1 : Number(raw)
+              }
             } catch (error) {
               void error
             }
-            if (stored === true) return
+            const revision = typeof data.revision === 'number' ? data.revision : -1
+            /* 详情页的设置刚被改过就把本地的临时覆盖让掉，否则改了看不到反应。 */
+            const changed = revision !== -1 && revision !== seen
+            try {
+              if (globalThis.localStorage !== undefined && revision !== -1) {
+                globalThis.localStorage.setItem('gw-cfg-rev:' + cwd, String(revision))
+              }
+            } catch (error) {
+              void error
+            }
+            if (stored === true && changed === false) return
             setPrefs({
               poll: typeof data.pollMs === 'number' ? data.pollMs : 3000,
               page: typeof data.pageSize === 'number' ? data.pageSize : 100,
+              showUncommitted: data.showUncommitted !== false,
+              confirmDiscard: data.confirmDiscard !== false,
             })
           } catch (failure) {
             void failure
