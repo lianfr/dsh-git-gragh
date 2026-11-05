@@ -352,7 +352,7 @@ window.__ModuleLoader__.load({
   background:var(--dsw-alias-bg-layer-3);
   border:.5px solid var(--dsw-alias-border-l2);
   box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
-.gw-menu-item { display:flex; align-items:center; padding:4px 7px; line-height:18px;
+.gw-menu-item { display:flex; align-items:center; padding:6px 8px; line-height:18px;
   border-radius:var(--dsw-radius-md, 12px);
   font-size:calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
