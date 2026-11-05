@@ -116,6 +116,7 @@ window.__ModuleLoader__.load({
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
 .gw-card-wide { max-width:560px; }
+.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:4px 12px 12px; }
 .gw-output { display:flex; flex-direction:column; gap:1px; font-family:var(--ds-font-family-code, ui-monospace, Menlo, monospace); font-size:11px; }
 .gw-output-row { display:flex; align-items:baseline; gap:8px; padding:3px 0;
   border-bottom:1px solid var(--dsw-alias-border-l1); color:var(--dsw-alias-label-secondary); }
@@ -1262,49 +1263,33 @@ window.__ModuleLoader__.load({
 
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
-    /** 标签页形态的「显示 Git 输出」：最近执行过的命令，最新的在前。 */
-    function OutputTab(props) {
+    /** 下半区的「显示 Git 输出」：最近执行过的命令，最新的在前，和差异页同一个位置。 */
+    function OutputPane(props) {
       const t = props.t
-      const [records, setRecords] = useState([])
-      const [token, setToken] = useState(0)
-      useEffect(() => {
-        let alive = true
-        void (async () => {
-          try {
-            const data = await api('gitRecords', { limit: 200 })
-            if (alive) setRecords(Array.isArray(data.records) ? data.records : [])
-          } catch (error) {
-            void error
-          }
-        })()
-        return () => { alive = false }
-      }, [token])
       const at = (ms) => {
         const date = new Date(ms)
         const pad = (value) => (value < 10 ? '0' + String(value) : String(value))
         return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
       }
-      return E('div', { className: 'gw-files-tab' },
-        E('div', { className: 'gw-files-tab-bar' },
-          E('span', { className: 'gw-files-tab-title' }, t('showOutput')),
+      return E('div', { className: 'gw-diff' },
+        E('div', { className: 'gw-diff-head' },
+          E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '\u2190 ' + t('back')),
+          E('span', { className: 'gw-diff-title' }, t('showOutput')),
           E('span', { className: 'gw-spacer' }),
-          E('button', {
-            className: 'gw-icon',
-            'data-tip': t('refresh'),
-            onClick: () => setToken(token + 1),
-          }, E('svg', {
-            width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
-            stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
-          }, E('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5.4H10' })))),
-        records.length === 0
+          E('button', { className: 'gw-icon', 'data-tip': t('refresh'), onClick: props.onRefresh },
+            E('svg', {
+              width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
+              stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+            }, E('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5.4H10' })))),
+        props.records.length === 0
           ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
-          : E('div', { className: 'gw-output' }, records.map((item, index) => E('div', {
+          : E('div', { className: 'gw-output-scroll' }, E('div', { className: 'gw-output' }, props.records.map((item, index) => E('div', {
             key: 'o' + String(index),
             className: 'gw-output-row' + (item.failed === true ? ' gw-output-fail' : ''),
           },
             E('span', { className: 'gw-output-time' }, at(item.at)),
             E('span', { className: 'gw-output-cmd' }, item.command),
-            E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms')))))
+            E('span', { className: 'gw-output-ms' }, String(item.ms) + ' ms'))))))
     }
 
     /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
@@ -1870,6 +1855,8 @@ window.__ModuleLoader__.load({
       const [ask, setAsk] = useState(null)
       const [treeView, setTreeView] = useState(false)
       const [settingsOpen, setSettingsOpen] = useState(false)
+      const [outputOpen, setOutputOpen] = useState(false)
+      const [outputList, setOutputList] = useState([])
       const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
@@ -2148,17 +2135,6 @@ window.__ModuleLoader__.load({
 
       /** 每组标题上的批量动作，悬停才出现；冲突组没有批量操作。 */
       /* 一个分组的所有文件放进同一个差异标签页，省得一个一个点。 */
-      /** 「显示 Git 输出」开成侧边栏自己的标签页，和差异页同一个位置。 */
-      const openOutputTab = useCallback(() => {
-        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
-        if (service === undefined || service === null || typeof service.openTab !== 'function') return
-        try {
-          service.openTab({ type: 'git-workbench-output', id: 'gw-output', title: t('showOutput') }, scope)
-        } catch (error) {
-          void error
-        }
-      }, [ctx, scope, t])
-
       const openGroupDiff = useCallback((group, items) => {
         const paths = items.map((item) => item.path)
         if (paths.length === 0) return
@@ -2678,7 +2654,19 @@ window.__ModuleLoader__.load({
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
       const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
 
-      const body = diffView !== null
+      const body = outputOpen === true
+        ? E(OutputPane, {
+            t: t,
+            records: outputList,
+            onBack: () => setOutputOpen(false),
+            onRefresh: () => {
+              void run(async () => {
+                const data = await api('gitRecords', { limit: 200 })
+                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+              })
+            },
+          })
+        : diffView !== null
         ? E(DiffPane, {
             t: t,
             title: diffView.title,
@@ -2848,7 +2836,12 @@ window.__ModuleLoader__.load({
             E('div', { key: 'sep-output', className: 'gw-menu-sep' }),
             menuRow(t('showOutput'), () => {
               setMoreOpen(false)
-              openOutputTab()
+              setDiffView(null)
+              setOutputOpen(true)
+              void run(async () => {
+                const data = await api('gitRecords', { limit: 200 })
+                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+              })
             }))),
         settingsOpen === false ? null : E(SettingsDialog, {
           t: t,
@@ -3100,15 +3093,6 @@ window.__ModuleLoader__.load({
               scope: tabProps.scope,
               tab: tabProps.tab,
             }),
-          })
-          /* 命令输出标签：同样隐藏，只从更多操作菜单打开。 */
-          const offOutput = betterSidebar.registerTab({
-            id: 'git-workbench-output',
-            title: () => t('showOutput'),
-            hidden: true,
-            single: true,
-            dedupeKey: () => 'git-workbench-output',
-            component: (tabProps) => E(OutputTab, { t: t, ctx: tabProps.ctx, scope: tabProps.scope, tab: tabProps.tab }),
           })
           return () => {
             if (typeof off === 'function') off()
