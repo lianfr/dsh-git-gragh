@@ -84,6 +84,9 @@ window.__ModuleLoader__.load({
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
 .gw-files-tab { display:flex; flex-direction:column; height:100%; min-height:0; overflow:auto; }
+.gw-files-tab-bar { display:flex; align-items:center; gap:6px; padding:4px 8px 4px 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-files-tab-title { font-size:11px; color:var(--dsw-alias-label-tertiary); }
 .gw-files-tab-head { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
 .gw-files-tab-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
@@ -391,6 +394,7 @@ window.__ModuleLoader__.load({
         changesGroup: '更改',
         filesTabTitle: '差异',
         openAllDiffs: '打开全部差异',
+        filesUnit: '个文件',
         stageAllChanges: '暂存全部更改',
         unstageAllChanges: '取消暂存全部',
         discardAllChanges: '撤销所有更改',
@@ -525,6 +529,7 @@ window.__ModuleLoader__.load({
         changesGroup: 'Changes',
         filesTabTitle: 'Diffs',
         openAllDiffs: 'Open all diffs',
+        filesUnit: 'files',
         stageAllChanges: 'Stage all changes',
         unstageAllChanges: 'Unstage all changes',
         discardAllChanges: 'Discard all changes',
@@ -2577,6 +2582,7 @@ window.__ModuleLoader__.load({
       const hash = typeof meta.hash === 'string' ? meta.hash : ''
       const [state, setState] = useState({ loading: true, items: [], error: null })
       const [open, setOpen] = useState({})
+      const [token, setToken] = useState(0)
       const alive = useRef(true)
 
       useEffect(() => {
@@ -2601,12 +2607,26 @@ window.__ModuleLoader__.load({
           }
         })()
         return () => { alive.current = false }
-      }, [cwd, staged, hash])
+      }, [cwd, staged, hash, token])
 
-      if (state.loading === true) return E('div', { className: 'gw-pad' }, t('loading'))
-      if (state.error !== null) return E('div', { className: 'gw-pad' }, state.error)
+      const head = E('div', { className: 'gw-files-tab-bar' },
+        E('span', { className: 'gw-files-tab-title' }, String(paths.length) + ' ' + t('filesUnit')),
+        E('span', { className: 'gw-spacer' }),
+        E('button', {
+          className: 'gw-icon',
+          'data-tip': t('refresh'),
+          onClick: () => setToken(token + 1),
+        }, E('svg', {
+          width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none',
+          stroke: 'currentColor', strokeWidth: 1.2,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
+        }, E('path', { d: 'M13.4 8a5.4 5.4 0 1 1-1.7-3.9M13.4 2.2V6H9.6' }))))
+
+      if (state.loading === true) return E('div', { className: 'gw-files-tab' }, head, E('div', { className: 'gw-pad' }, t('loading')))
+      if (state.error !== null) return E('div', { className: 'gw-files-tab' }, head, E('div', { className: 'gw-pad' }, state.error))
 
       return E('div', { className: 'gw-files-tab' },
+        head,
         state.items.map((item, index) => {
           const openNow = open[item.path] !== false
           const rows = splitDiff(item.text === undefined ? '' : item.text)

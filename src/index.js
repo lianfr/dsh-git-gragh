@@ -236,17 +236,24 @@ async function fileDiff(payload) {
   const hash = typeof payload.hash === 'string' && payload.hash !== '' ? hashArg(payload.hash) : null
 
   let args
+  /* 未跟踪的文件在 git diff 里是隐形的，得跟 /dev/null 比。
+     这里自己判断，不指望调用方一定记得传 untracked。 */
+  let untracked = payload.untracked === true
   if (hash !== null) {
     args = ['show', '--format=', '--patch', '--no-color', hash, '--', filePath]
   } else if (payload.staged === true) {
     args = ['diff', '--cached', '--no-color', '--', filePath]
-  } else if (payload.untracked === true) {
-    args = ['diff', '--no-index', '--no-color', '--', '/dev/null', filePath]
   } else {
-    args = ['diff', '--no-color', '--', filePath]
+    if (untracked === false) {
+      const tracked = await gitTextQuiet(cwd, ['ls-files', '--error-unmatch', '--', filePath])
+      untracked = tracked === null
+    }
+    args = untracked === true
+      ? ['diff', '--no-index', '--no-color', '--', '/dev/null', filePath]
+      : ['diff', '--no-color', '--', filePath]
   }
 
-  const result = await runGit(cwd, args, { allowNonZero: payload.untracked === true })
+  const result = await runGit(cwd, args, { allowNonZero: untracked })
   return { path: filePath, text: result.stdout }
 }
 
