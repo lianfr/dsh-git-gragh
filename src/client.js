@@ -1513,10 +1513,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
               item('discard', t('confirmDiscardLabel'), t('confirmDiscardDesc'),
                 E(SettingSwitch, { on: confirmDiscard, onFlip: setConfirmDiscard })))),
           E('div', { className: 'gw-card-foot' },
-            E('button', {
-              className: 'gw-btn gw-btn-ghost gw-btn-sm',
-              onClick: props.onOpenPluginSettings,
-            }, t('openPluginSettings')),
             E('span', { className: 'gw-spacer' }),
             E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, t('cancel')),
             E('button', {
@@ -2462,21 +2458,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 
       const collapsedSet = useMemo(() => new Set(collapsedDirs), [collapsedDirs])
 
-      /* 设置按钮优先交给宿主：pluginNavigation.openBundle 会直接跳到插件详情页，
-         那一页里能改本插件的 Config。宿主没有这个服务时才退回自己的对话框。 */
-      const openPluginSettings = useCallback(() => {
-        try {
-          const navigation = ctx === undefined || ctx === null ? undefined : ctx.get('pluginNavigation')
-          if (navigation !== undefined && navigation !== null && typeof navigation.openBundle === 'function') {
-            navigation.openBundle(PKG)
-            return
-          }
-        } catch (failure) {
-          void failure
-        }
-        setSettingsOpen(true)
-      }, [ctx])
-
       const doSync = useCallback((method) => {
         if (syncBusy !== '') return
         void run(async () => {
@@ -3105,7 +3086,6 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         settingsOpen === false ? null : E(SettingsDialog, {
           t: t,
           prefs: prefs,
-          onOpenPluginSettings: () => { setSettingsOpen(false); openPluginSettings() },
           onClose: () => setSettingsOpen(false),
           onSave: (next) => {
             setPrefs(next)
