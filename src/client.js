@@ -80,7 +80,8 @@ window.__ModuleLoader__.load({
 .gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:11.5px; }
 .gw-tree-dir:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-caret { width:10px; display:inline-block; text-align:center; opacity:.7; }
+.gw-caret { width:12px; flex:none; display:inline-block; text-align:center;
+  font-size:11px; line-height:1; opacity:.7; }
 .gw-count { color:var(--dsw-alias-label-tertiary); }
 .gw-group-actions { margin-left:auto; display:flex; gap:4px; }
 
@@ -2228,20 +2229,6 @@ window.__ModuleLoader__.load({
               ? null
               : E('div', null,
                   E(ChangeGroup, {
-                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
-                    action: null,
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('conflicts'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
-                  }),
-                  E(ChangeGroup, {
-                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
-                    action: groupActions('staged', staged),
-                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
-                    onToggle: () => toggleGroup('staged'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
-                  }),
-                  E(ChangeGroup, {
                     group: 'unstaged', title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
                     action: groupActions('unstaged', unstaged),
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
@@ -2253,6 +2240,20 @@ window.__ModuleLoader__.load({
                     action: groupActions('untracked', untracked),
                     tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
                     onToggle: () => toggleGroup('untracked'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
+                    action: groupActions('staged', staged),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('staged'),
+                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
+                    action: null,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('conflicts'),
                     onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
                   }))))
 
