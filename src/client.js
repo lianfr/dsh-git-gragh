@@ -269,7 +269,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-act { position:relative; }
 .gw-act::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:5px 8px; border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
-  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  background:var(--dsw-alias-tooltip-bg, #2b2b30); color:var(--dsw-alias-label-primary);
   font-size:11px; line-height:1.3; white-space:nowrap; pointer-events:none;
   box-shadow:0 2px 8px rgba(0,0,0,.28); opacity:0; visibility:hidden;
   transition:opacity .12s ease, visibility .12s ease; z-index:10000; }
@@ -285,7 +285,7 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
   padding:3px 7px; border-radius:4px; border-radius:var(--dsw-radius-xs, 4px);
-  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  background:var(--dsw-alias-tooltip-bg, #2b2b30); color:var(--dsw-alias-label-primary);
   border:1px solid var(--dsw-alias-border-l2); box-shadow:0 4px 14px rgba(0,0,0,.22);
   font-size:11px; font-weight:400; line-height:1.4; white-space:nowrap;
   opacity:0; visibility:hidden; pointer-events:none; transition:opacity .12s ease; z-index:10000; }
