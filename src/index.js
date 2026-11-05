@@ -172,26 +172,24 @@ async function log(payload) {
   const page = hasMore ? history.slice(0, limit) : history
 
   /*
-   * stash 单独取一条插进首屏，不放进上面那次遍历。
-   * 它不在 branches/tags/remotes 里，挂在 rev 列表上会被顺着第二父带出
-   * index 快照；那些快照解析出来还得丢掉，丢的时候条数就少，分页跟着错。
-   * 只取 stash@{0} 这一个提交本身，父提交交给图去连。
-   * 只在 skip 为 0 时插：翻页时它已经在上面，每页都插会出现好几行。
+   * stash 单独取一条，挂到它的父提交前面——父就是 stash 那一刻的 HEAD。
+   * 不按时间插：stash 的提交时间可能比父晚上很多天，按时间会把它甩到几十行
+   * 之外，而父又不在这一页里，图上就成了一条悬空的短链，还会和真正经过那一列
+   * 的线缠在一起。
+   * 父不在本页就干脆不插，它会在父所在的那一页出现。这与 Git Graph 的判断
+   * 一致（只有 baseHash 在列表里才插入 stash）。
    */
-  if (skip === 0 && (typeof payload.ref !== 'string' || payload.ref === '')) {
+  if (typeof payload.ref !== 'string' || payload.ref === '') {
     const stashHash = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
     if (stashHash !== null && stashHash.trim() !== '') {
       const stashRaw = await gitTextQuiet(cwd, [
         'log', '--no-walk=unsorted', '--decorate=full', '--format=' + LOG_FORMAT, stashHash.trim(),
       ])
       const stashEntry = stashRaw === null ? null : parseLog(stashRaw)[0]
-      if (stashEntry !== undefined && stashEntry !== null && page.some((item) => item.hash === stashEntry.hash) === false) {
-        // 按时间插回去，保证「新的在上、旧的在下」与父在子之后的次序不乱。
-        let at = page.length
-        for (let i = 0; i < page.length; i++) {
-          if (page[i].time < stashEntry.time) { at = i; break }
-        }
-        page.splice(at, 0, stashEntry)
+      if (stashEntry !== undefined && stashEntry !== null) {
+        const base = Array.isArray(stashEntry.parents) ? stashEntry.parents[0] : undefined
+        const at = base === undefined ? -1 : page.findIndex((item) => item.hash === base)
+        if (at >= 0 && page.some((item) => item.hash === stashEntry.hash) === false) page.splice(at, 0, stashEntry)
       }
     }
   }
