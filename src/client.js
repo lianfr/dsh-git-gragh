@@ -1737,17 +1737,22 @@ window.__ModuleLoader__.load({
       const openDiffTab = useCallback((ref, title) => {
         const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
         if (service === undefined || service === null || typeof service.openTab !== 'function') return false
+        /* 统一走我们自己的批量差异标签：单文件也是它，
+           这样符号只有 + 和 −，不会出现那个修饰行的 ~。 */
+        const meta = ref.kind === 'worktree'
+          ? { cwd: cwd, paths: [ref.path], staged: ref.staged === true }
+          : { cwd: cwd, paths: [ref.path], hash: ref.hashFull }
         const key = ref.kind === 'worktree'
-          ? 'diff:worktree:' + ref.path + ':' + String(ref.staged)
-          : 'diff:commit:' + ref.hashFull
+          ? 'files:worktree:' + ref.path + ':' + String(ref.staged)
+          : 'files:commit:' + ref.hashFull + ':' + ref.path
         try {
-          service.openTab({ type: 'diff', id: key, title: title, diff: ref }, scope)
+          service.openTab({ type: 'git-workbench-files', id: key, title: title, meta: meta }, scope)
           return true
         } catch (failure) {
           void failure
           return false
         }
-      }, [ctx, scope])
+      }, [ctx, scope, cwd])
 
       /* 工作区的文件：单文件 diff，未暂存与已暂存各看各的那一侧。 */
       const openInEditor = useCallback((item) => {
@@ -1764,12 +1769,12 @@ window.__ModuleLoader__.load({
 
       /* 提交详情里的文件：侧边栏的 diff 标签只认「整个提交」，here 就打开该提交。 */
       const openCommitDiff = useCallback(async (file) => {
-        if (selected === null || detail === null) return
         const ref = {
           kind: 'commit',
+          path: file.path,
           hash: String(selected).slice(0, 7),
           hashFull: String(selected),
-          subject: detail.subject,
+          subject: '',
         }
         if (openDiffTab(ref, file.path) === true) return
         setDiffView({ title: file.path, text: '', loading: true })
@@ -2569,6 +2574,7 @@ window.__ModuleLoader__.load({
       const cwd = typeof meta.cwd === 'string' ? meta.cwd : (ctx === undefined || ctx === null ? '' : sessionCwdOf(ctx, scope === undefined ? undefined : scope.sessionId))
       const paths = Array.isArray(meta.paths) ? meta.paths : []
       const staged = meta.staged === true
+      const hash = typeof meta.hash === 'string' ? meta.hash : ''
       const [state, setState] = useState({ loading: true, items: [], error: null })
       const [open, setOpen] = useState({})
       const alive = useRef(true)
@@ -2580,7 +2586,10 @@ window.__ModuleLoader__.load({
             const loaded = []
             for (const item of paths) {
               try {
-                const data = await api('fileDiff', { cwd: cwd, path: item, staged: staged })
+                const ask = hash === ''
+                  ? { cwd: cwd, path: item, staged: staged }
+                  : { cwd: cwd, hash: hash, path: item }
+                const data = await api('fileDiff', ask)
                 loaded.push({ path: item, text: typeof data.text === 'string' ? data.text : '' })
               } catch (failure) {
                 loaded.push({ path: item, text: String(failure.message), failed: true })
@@ -2592,7 +2601,7 @@ window.__ModuleLoader__.load({
           }
         })()
         return () => { alive.current = false }
-      }, [cwd, staged])
+      }, [cwd, staged, hash])
 
       if (state.loading === true) return E('div', { className: 'gw-pad' }, t('loading'))
       if (state.error !== null) return E('div', { className: 'gw-pad' }, state.error)
