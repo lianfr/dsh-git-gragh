@@ -240,17 +240,22 @@ async function fileDiff(payload) {
      这里自己判断，不指望调用方一定记得传 untracked。 */
   let untracked = payload.untracked === true
   if (hash !== null) {
-    args = ['show', '--format=', '--patch', '--no-color', hash, '--', filePath]
+    args = ['show', '--format=', '--patch', '--no-color']
+      .concat(payload.full === true ? ['-U999999'] : [], [hash, '--', filePath])
   } else if (payload.staged === true) {
-    args = ['diff', '--cached', '--no-color', '--', filePath]
+    args = ['diff', '--cached', '--no-color']
+      .concat(payload.full === true ? ['-U999999'] : [], ['--', filePath])
   } else {
     if (untracked === false) {
       const tracked = await gitTextQuiet(cwd, ['ls-files', '--error-unmatch', '--', filePath])
       untracked = tracked === null
     }
+    /* full 表示要完整上下文：面板自己把没改的段落折起来，
+       这样折叠条能真正展开，而不是只显示个数字。 */
+    const context = payload.full === true ? ['-U999999'] : []
     args = untracked === true
-      ? ['diff', '--no-index', '--no-color', '--', '/dev/null', filePath]
-      : ['diff', '--no-color', '--', filePath]
+      ? ['diff', '--no-index', '--no-color'].concat(context, ['--', '/dev/null', filePath])
+      : ['diff', '--no-color'].concat(context, ['--', filePath])
   }
 
   const result = await runGit(cwd, args, { allowNonZero: untracked })

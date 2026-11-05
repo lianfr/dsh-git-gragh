@@ -256,7 +256,13 @@ window.__ModuleLoader__.load({
 .gw-diff-body { flex:1 1 auto; min-height:0; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   font-size:11px; line-height:1.5; }
 .gw-diff-line { display:flex; white-space:pre; }
-.gw-diff-sign { flex:none; width:12px; text-align:center; user-select:none;
+.gw-diff-fold { display:flex; align-items:center; height:22px; padding:0 10px;
+  cursor:pointer; background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
+  border-top:1px solid var(--dsw-alias-border-l1);
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-diff-fold:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.gw-diff-fold-text { font-size:11px; color:var(--dsw-alias-label-tertiary); }
+.gw-diff-sign { flex:none; width:12px; margin-right:8px; text-align:center; user-select:none;
   color:var(--dsw-alias-label-tertiary); }
 .gw-diff-add .gw-diff-sign { color:var(--dsw-alias-state-success-primary); }
 .gw-diff-del .gw-diff-sign { color:var(--dsw-alias-state-error-primary); }
@@ -402,6 +408,7 @@ window.__ModuleLoader__.load({
         filesTabTitle: '差异',
         openAllDiffs: '打开全部差异',
         filesUnit: '个文件',
+        unmodifiedLines: '行未改动',
         stageAllChanges: '暂存全部更改',
         unstageAllChanges: '取消暂存全部',
         discardAllChanges: '撤销所有更改',
@@ -537,6 +544,7 @@ window.__ModuleLoader__.load({
         filesTabTitle: 'Diffs',
         openAllDiffs: 'Open all diffs',
         filesUnit: 'files',
+        unmodifiedLines: 'unmodified lines',
         stageAllChanges: 'Stage all changes',
         unstageAllChanges: 'Unstage all changes',
         discardAllChanges: 'Discard all changes',
@@ -980,6 +988,37 @@ window.__ModuleLoader__.load({
       return rows
     }
 
+    /**
+     * 把连续的未改动行折起来，只在改动前后各留三行。
+     * 展开状态按「这段起点在整篇里的下标」记，所以折叠/展开是纯前端的事，
+     * 不用重新请求——这也是后端要 full 上下文的原因。
+     */
+    function foldRows(rows, unfolded) {
+      const out = []
+      let i = 0
+      while (i < rows.length) {
+        if (rows[i].type !== 'ctx') { out.push(rows[i]); i += 1; continue }
+        let j = i
+        while (j < rows.length && rows[j].type === 'ctx') j += 1
+        const run = j - i
+        const head = Math.min(3, run)
+        const tail = Math.min(3, Math.max(0, run - head))
+        const hidden = run - head - tail
+        for (let k = 0; k < head; k++) out.push(rows[i + k])
+        if (hidden > 0) {
+          const key = 'f' + String(i)
+          if (unfolded[key] === true) {
+            for (let k = 0; k < hidden; k++) out.push(rows[i + head + k])
+          } else {
+            out.push({ type: 'fold', count: hidden, key: key })
+          }
+        }
+        for (let k = Math.max(head, run - tail); k < run; k++) out.push(rows[i + k])
+        i = j
+      }
+      return out
+    }
+
     /* ------------------------------------------------------------------ */
     /* pieces                                                              */
     /* ------------------------------------------------------------------ */
@@ -1340,20 +1379,35 @@ window.__ModuleLoader__.load({
           E('span', null, entry.short)))
     }
 
-    /** 只要逐行着色那一段，供批量标签页复用。 */
+    /** 只要逐行着色那一段，供批量标签页复用；未改动的长段折起来，点一下就地展开。 */
     function DiffBody(props) {
-      const rows = useMemo(() => splitDiff(props.text === undefined ? '' : props.text), [props.text])
+      const t = props.t
+      const [unfolded, setUnfolded] = useState({})
+      const rows = useMemo(
+        () => foldRows(splitDiff(props.text === undefined ? '' : props.text), unfolded),
+        [props.text, unfolded],
+      )
       if (rows.length === 0) return E('div', { className: 'gw-empty' }, '—')
       return E('div', { className: 'gw-diff-body' },
-        rows.map((row, index) => E('div', {
-          key: 'd' + String(index),
-          className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
-            : row.type === 'del' ? ' gw-diff-del'
-              : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
-        },
-          E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
-          E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
-          E('span', { className: 'gw-diff-text' }, row.text))))
+        rows.map((row, index) => {
+          if (row.type === 'fold') {
+            return E('div', {
+              key: 'd' + String(index),
+              className: 'gw-diff-fold',
+              onClick: () => setUnfolded(Object.assign({}, unfolded, { [row.key]: true })),
+            },
+              E('span', { className: 'gw-diff-fold-text' }, String(row.count) + ' ' + t('unmodifiedLines')))
+          }
+          return E('div', {
+            key: 'd' + String(index),
+            className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
+              : row.type === 'del' ? ' gw-diff-del'
+                : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
+          },
+            E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
+            E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
+            E('span', { className: 'gw-diff-text' }, row.text))
+        }))
     }
 
     function DiffPane(props) {
@@ -1363,20 +1417,11 @@ window.__ModuleLoader__.load({
         E('div', { className: 'gw-diff-head' },
           E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '← ' + t('back')),
           E('span', { className: 'gw-diff-title' }, props.title)),
-        E('div', { className: 'gw-diff-body' },
-          props.loading
-            ? E('div', { className: 'gw-empty' }, t('loading'))
-            : rows.length === 0
-              ? E('div', { className: 'gw-empty' }, t('diffEmpty'))
-              : rows.map((row, index) => E('div', {
-                  key: 'd' + String(index),
-                  className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
-                    : row.type === 'del' ? ' gw-diff-del'
-                      : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
-                },
-                  E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
-                  E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
-                  E('span', { className: 'gw-diff-text' }, row.text)))))
+        props.loading
+          ? E('div', { className: 'gw-empty' }, t('loading'))
+          : rows.length === 0
+            ? E('div', { className: 'gw-empty' }, t('diffEmpty'))
+            : E(DiffBody, { t: t, text: props.text }))
     }
 
     function CommitDrawer(props) {
@@ -1739,6 +1784,7 @@ window.__ModuleLoader__.load({
             path: item.path,
             staged: item.staged === true,
             untracked: item.untracked === true,
+            full: true,
           })
           if (aliveRef.current) setDiffView({ title: item.path, text: data.text, loading: false })
         } catch (failure) {
@@ -1793,7 +1839,7 @@ window.__ModuleLoader__.load({
         if (openDiffTab(ref, file.path) === true) return
         setDiffView({ title: file.path, text: '', loading: true })
         try {
-          const data = await api('fileDiff', { cwd: cwd, hash: selected, path: file.path })
+          const data = await api('fileDiff', { cwd: cwd, hash: selected, path: file.path, full: true })
           if (aliveRef.current) setDiffView({ title: file.path + ' @ ' + String(selected).slice(0, 7), text: data.text, loading: false })
         } catch (failure) {
           if (aliveRef.current) setDiffView({ title: file.path, text: String(failure.message), loading: false })
@@ -2602,8 +2648,8 @@ window.__ModuleLoader__.load({
             for (const item of paths) {
               try {
                 const ask = hash === ''
-                  ? { cwd: cwd, path: item, staged: staged }
-                  : { cwd: cwd, hash: hash, path: item }
+                  ? { cwd: cwd, path: item, staged: staged, full: true }
+                  : { cwd: cwd, hash: hash, path: item, full: true }
                 const data = await api('fileDiff', ask)
                 loaded.push({ path: item, text: typeof data.text === 'string' ? data.text : '' })
               } catch (failure) {
@@ -2664,7 +2710,7 @@ window.__ModuleLoader__.load({
                       E('span', { className: 'gw-files-tab-add' }, '+' + String(added)),
                       ' ',
                       E('span', { className: 'gw-files-tab-del' }, '−' + String(removed))))),
-            openNow === false ? null : E(DiffBody, { text: item.text }))
+            openNow === false ? null : E(DiffBody, { t: t, text: item.text }))
         }))
     }
 
@@ -2737,6 +2783,14 @@ window.__ModuleLoader__.load({
           const offFiles = betterSidebar.registerTab({
             id: 'git-workbench-files',
             title: () => t('filesTabTitle'),
+            icon: (size) => E('svg', {
+              width: size === undefined ? 14 : size,
+              height: size === undefined ? 14 : size,
+              viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+              strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+            },
+              E('path', { d: 'M9.6 1.8H4.6a1.1 1.1 0 0 0-1.1 1.1v10.2a1.1 1.1 0 0 0 1.1 1.1h6.8a1.1 1.1 0 0 0 1.1-1.1V4.6z' }),
+              E('path', { d: 'M9.4 1.9v2.8h2.8' })),
             hidden: true,
             single: false,
             dedupeKey: (tab) => (tab === undefined || tab === null ? undefined : tab.id),
