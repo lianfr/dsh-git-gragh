@@ -3441,6 +3441,46 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         E('path', { d: 'M17 11.1v.9a3.2 3.2 0 0 1-3.2 3.2H9.2' }))
     }
 
+    /* 右侧栏：不依赖 better-sidebar 的那条路。注册一种 tab 类型，它会出现在
+       右侧栏的「更多工具」里，点开就在右侧栏显示；better-sidebar 在时它自己
+       那条注册也照旧，两边互不影响。 */
+    const RIGHTBAR_KIND = 'git-graph'
+    const RIGHTBAR_ID = 'dsh-git-graph/rightbar'
+
+    function RightbarBody(props) {
+      const ctx = props.ctx
+      const [sessionId, setSessionId] = useState('')
+      useEffect(() => {
+        if (ctx === undefined || ctx === null) return undefined
+        const controller = ctx.get('sidebarRight')
+        const mounted = controller === undefined || controller === null ? undefined : controller.mounted
+        if (mounted === undefined || mounted === null || typeof mounted.getSnapshot !== 'function') return undefined
+        const read = () => {
+          let value = ''
+          try {
+            value = mounted.getSnapshot()
+          } catch (error) {
+            void error
+          }
+          setSessionId(typeof value === 'string' ? value : '')
+        }
+        read()
+        const handle = typeof mounted.subscribe === 'function' ? mounted.subscribe(read) : undefined
+        return () => {
+          if (typeof handle === 'function') handle()
+        }
+      }, [ctx])
+      if (sessionId === '') {
+        const t = ctx === undefined || ctx === null ? (key) => key : translatorOf(ctx)
+        return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
+      }
+      return E(GitPanel, { ctx: ctx, scope: { sessionId: sessionId }, visible: true })
+    }
+
+    function RightbarTitle(props) {
+      return E('span', { className: 'gw-rightbar-title' }, props.t('title'))
+    }
+
     function apply(ctx) {
       injectStyles()
       ctx.inject(['betterSidebar'], (tabCtx) => {
@@ -3487,6 +3527,38 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
             if (typeof offOutput === 'function') offOutput()
           }
         }, 'dsh-git-graph: sidebar tab')
+      })
+
+      /* 右侧栏入口：走宿主自带的 sidebar-right，与 better-sidebar 无关。
+         tab 类型注册后它自己会出现在「更多工具」列表里，不需要额外按钮。 */
+      ctx.inject(['slots'], (slotCtx) => {
+        slotCtx.effect(() => {
+          const t = translatorOf(slotCtx)
+          const disposers = []
+          const tabs = slotCtx.get('sidebarRightTabs')
+          if (tabs !== undefined && tabs !== null && typeof tabs.register === 'function') {
+            disposers.push(tabs.register({
+              id: RIGHTBAR_ID,
+              kind: RIGHTBAR_KIND,
+              title: () => t('title'),
+            }))
+          }
+          disposers.push(slotCtx.slots.inject('sidebar.right.pane.tab', () => slotCtx.slots.register({
+            name: 'sidebar.right.pane.tab',
+            key: RIGHTBAR_ID,
+            inject: () => ({ ctx: slotCtx, t: t }),
+          }, RightbarBody)))
+          disposers.push(slotCtx.slots.inject('sidebar.right.pane.tab.title', () => slotCtx.slots.register({
+            name: 'sidebar.right.pane.tab.title',
+            key: RIGHTBAR_ID,
+            inject: () => ({ t: t }),
+          }, RightbarTitle)))
+          return () => {
+            for (let i = disposers.length - 1; i >= 0; i -= 1) {
+              if (typeof disposers[i] === 'function') disposers[i]()
+            }
+          }
+        }, 'dsh-git-graph: 右侧栏')
       })
     }
 
