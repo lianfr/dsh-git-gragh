@@ -382,7 +382,7 @@ window.__ModuleLoader__.load({
         changesGroup: '更改',
         stageAllChanges: '暂存全部更改',
         unstageAllChanges: '取消暂存全部',
-        discardAllChanges: '放弃全部更改',
+        discardAllChanges: '撤销所有更改',
         syncGroup: '拉取、推送',
         pullThenPush: '先拉取再推送',
         branchesGroup: '分支',
@@ -419,9 +419,9 @@ window.__ModuleLoader__.load({
         unstageAll: '全部取消暂存',
         stage: '暂存',
         unstage: '取消暂存',
-        discard: '放弃更改',
+        discard: '撤销更改',
         discardConfirm: '确定放弃对 {path} 的更改？此操作无法撤销。',
-        discardAllConfirm: '确定放弃全部未暂存的更改？此操作无法撤销。',
+        discardAllConfirm: '确定撤销全部未暂存的更改？此操作无法撤销。',
         noChanges: '工作区干净',
         uncommitted: '未提交的更改',
         noCommits: '还没有提交',
@@ -2413,7 +2413,7 @@ window.__ModuleLoader__.load({
       stage: ['M8 3.4v9.2M3.4 8h9.2'],
       unstage: ['M3.4 8h9.2'],
       // 撤销：一个从右下折回左上的回转箭头，与 VSCode 的那个同形。
-      discard: ['M10.6 4H8a4.1 4.1 0 0 0 0 8.2H4.6', 'M6.6 10.1 4.5 12.2 6.6 14.3'],
+      discard: ['M4 4.4H9.4a4.3 4.3 0 0 1 0 8.6H5.6', 'M7.6 10.8 5.4 13 7.6 15.2'],
       ignore: ['M8 2.4a5.6 5.6 0 1 0 0 11.2A5.6 5.6 0 0 0 8 2.4z', 'M4.2 11.8 11.8 4.2'],
     }
 
