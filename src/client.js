@@ -128,20 +128,24 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
   white-space:nowrap; max-width:45%; }
 /* 原生 select 的下拉由浏览器画，位置和外溢都管不住，这里改成自己画一层。 */
 .gw-dd { position:relative; display:inline-flex; }
-.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-xs, 4px);
-  border:1px solid var(--dsw-alias-border-l2); background:transparent; color:var(--dsw-alias-label-secondary);
+.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-sm, 8px);
+  border:none; background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
+  color:var(--dsw-alias-label-secondary);
   font-size:11px; cursor:pointer; white-space:nowrap; }
-.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent); }
 .gw-dd-scrim { position:fixed; inset:0; z-index:70; }
 .gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
-  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-md, 12px);
-  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
-  box-shadow:0 10px 28px rgba(0, 0, 0, .16); }
+  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-lg, 16px);
+  border:none; background:var(--dsw-alias-bg-layer-2);
+  box-shadow:0 12px 32px rgba(0, 0, 0, .18); }
 .gw-dd-item { display:block; width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
   border:none; background:transparent; border-radius:var(--dsw-radius-sm, 8px);
   font-size:11px; color:var(--dsw-alias-label-secondary); cursor:pointer; white-space:nowrap; }
 .gw-dd-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
-.gw-dd-item-on { color:var(--dsw-alias-brand-primary); font-weight:600; }
+.gw-dd-item-on { color:var(--dsw-alias-label-primary); font-weight:600; }
+/* 选中项在右侧留一个勾，跟宿主设置页的选择器一致 */
+.gw-dd-item-on::after { content:'✓'; float:right; margin-left:8px;
+  color:var(--dsw-alias-brand-primary); }
 .gw-output-search { height:22px; width:120px; box-sizing:border-box; padding:0 6px;
   border-radius:var(--dsw-radius-xs, 4px); border:1px solid var(--dsw-alias-border-l2);
   background:transparent; color:var(--dsw-alias-label-primary); font-size:11px; outline:none; }
@@ -173,10 +177,11 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-switch { position:relative; flex:none; width:34px; height:20px; padding:0; border:none;
   border-radius:10px; cursor:pointer; transition:background .15s ease;
   background:var(--dsw-alias-interactive-bg-active);
-  background:color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent); }
-.gw-switch-on { background:var(--dsw-alias-brand-primary); }
-.gw-switch-knob { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:8px;
-  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.22); transition:transform .15s ease; }
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent); }
+/* 开启态是实心深色轨道，白点几乎撑满，圆角跟着轨道走 */
+.gw-switch-on { background:var(--dsw-alias-label-primary); }
+.gw-switch-knob { position:absolute; top:1.5px; left:1.5px; width:17px; height:17px; border-radius:8.5px;
+  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.28); transition:transform .15s ease; }
 .gw-switch-on .gw-switch-knob { transform:translateX(14px); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
