@@ -5,10 +5,78 @@
  * 超过上限直接掐断，避免一个巨型 diff 把进程撑爆。
  */
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+
+/* 最近执行过的 git 命令，环形保留。用于面板里的「显示 Git 输出」。 */
+const MAX_RECORDS = 300
+const records = []
+
+/* 只读查询归到 repository，写操作与网络操作归到 git。
+   轮询会不停发 status 和 log，级别按 debug 记，默认视图里不喧宾夺主。 */
+const READ_ONLY = new Set([
+  'status', 'log', 'diff', 'show', 'for-each-ref', 'rev-parse', 'ls-files',
+  'symbolic-ref', 'rev-list', 'cat-file', 'blame', 'describe', 'merge-base', 'diff-tree',
+])
+
+let gitPath = null
+
+/** git 可执行文件的实际位置，用于在输出页顶部显示。 */
+export function gitExecutable() {
+  if (gitPath !== null) return gitPath
+  try {
+    gitPath = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
+  } catch (failure) {
+    void failure
+    gitPath = 'git'
+  }
+  if (gitPath === '') gitPath = 'git'
+  return gitPath
+}
+
+function remember(args, startedAt, value, quiet) {
+  /* 记录本身绝不能让进程倒下：参数形状不对就退化成一条空命令。 */
+  const argv = Array.isArray(args) ? args : []
+  const first = typeof argv[0] === 'string' ? argv[0] : ''
+  const category = READ_ONLY.has(first) ? 'repository' : 'git'
+  const entry = {
+    at: startedAt,
+    ms: Date.now() - startedAt,
+    command: 'git ' + argv.join(' '),
+    category: category,
+    level: category === 'repository' ? 'debug' : 'info',
+  }
+  if (value instanceof Error) {
+    /* 「有没有上游」这类探测失败是预期之内的，不该在列表里飘红。 */
+    if (quiet === true) {
+      entry.level = 'debug'
+      entry.message = String(value.message).slice(0, 400)
+    } else {
+      entry.level = 'error'
+      entry.failed = true
+      entry.message = String(value.message).slice(0, 400)
+    }
+  } else {
+    entry.code = value.code
+    entry.stdoutBytes = value.stdout.length
+    entry.stderr = value.stderr.slice(0, 400)
+    /* 只有出错时才把 stdout 正文留下来，正常结果只记字节数。 */
+    if (value.code !== 0) {
+      entry.level = 'error'
+      entry.stdout = value.stdout.slice(0, 800)
+    }
+  }
+  records.push(entry)
+  if (records.length > MAX_RECORDS) records.shift()
+}
+
+/** 最近的命令，最新的在前。 */
+export function recentGit(limit) {
+  const size = typeof limit === 'number' && limit > 0 ? limit : MAX_RECORDS
+  return records.slice(-size).reverse()
+}
 
 export class GitError extends Error {
   constructor(message, code = 'git-failed', status = 400) {
@@ -46,10 +114,12 @@ export function runGit(cwd, args, options = {}) {
     let settled = false
     let timer = null
 
+    const startedAt = Date.now()
     const finish = (handler, value) => {
       if (settled) return
       settled = true
       if (timer !== null) clearTimeout(timer)
+      remember(args, startedAt, value, options.quiet === true)
       handler(value)
     }
     const kill = () => {
@@ -99,8 +169,9 @@ export async function gitText(cwd, args, options) {
 
 /** 执行 git，失败时返回 null 而不是抛出——用于"有更好，没有也行"的信息。 */
 export async function gitTextQuiet(cwd, args, options) {
+  const quiet = Object.assign({}, options, { quiet: true })
   try {
-    return await gitText(cwd, args, options)
+    return await gitText(cwd, args, quiet)
   } catch (error) {
     void error
     return null

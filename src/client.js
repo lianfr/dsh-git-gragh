@@ -8,8 +8,39 @@ window.__ModuleLoader__.load({
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
+/* Git 输出页的筛选档位，与 VSCode 的日志级别对齐。 */
+const POLL_LEVELS = ['all', 'error', 'warning', 'info', 'debug', 'trace']
+const OUTPUT_KINDS = ['all', 'git', 'repository']
     const UNCOMMITTED_HASH = '@uncommitted'
   const POLL_MS = 3000
+
+  /* 面板偏好按仓库路径分开存：同一个人在不同仓库上可能想要不同的刷新频率。 */
+  const PREFS_POLL = [0, 3000, 10000]
+  const PREFS_PAGE = [50, 100, 200]
+
+  function loadPrefs(key) {
+    const fallback = { poll: 3000, page: 100 }
+    try {
+      const raw = globalThis.localStorage === undefined ? null : globalThis.localStorage.getItem('gw-prefs:' + key)
+      if (raw === null) return fallback
+      const parsed = JSON.parse(raw)
+      return {
+        poll: PREFS_POLL.indexOf(parsed.poll) >= 0 ? parsed.poll : fallback.poll,
+        page: PREFS_PAGE.indexOf(parsed.page) >= 0 ? parsed.page : fallback.page,
+      }
+    } catch (error) {
+      void error
+      return fallback
+    }
+  }
+
+  function savePrefs(key, value) {
+    try {
+      if (globalThis.localStorage !== undefined) globalThis.localStorage.setItem('gw-prefs:' + key, JSON.stringify(value))
+    } catch (error) {
+      void error
+    }
+  }
     const ROW_H = 24
     const LANE_W = 14
     const DRAWER_H = 300
@@ -39,13 +70,15 @@ window.__ModuleLoader__.load({
   font:inherit; font-size:12px; border-radius:6px; cursor:pointer; white-space:nowrap;
   border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
   color:var(--dsw-alias-label-primary); }
-.gw-btn:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-btn:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-btn:disabled { opacity:.45; cursor:default; }
 .gw-btn-primary { border-color:transparent; background:var(--dsw-alias-button-primary-fill);
   color:var(--dsw-alias-label-primary-inverted); }
 .gw-btn-primary:hover { background:var(--dsw-alias-button-primary-hover); }
 .gw-btn-ghost { border-color:transparent; background:transparent; color:var(--dsw-alias-label-secondary); }
-.gw-btn-ghost:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-btn-ghost:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
 .gw-btn-sm { height:20px; padding:0 7px; font-size:11px; }
 
 .gw-check { display:inline-flex; align-items:center; gap:5px; cursor:pointer; user-select:none;
@@ -53,14 +86,105 @@ window.__ModuleLoader__.load({
 .gw-check input { margin:0; cursor:pointer; }
 
 .gw-changes { flex:1 1 auto; min-height:0; overflow:auto; padding-bottom:4px; }
-.gw-group-head { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer;
+.gw-badge { flex:none; min-width:16px; height:16px; padding:0 5px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center; border-radius:8px;
+  font-size:10px; font-weight:600; line-height:1;
+  background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-secondary); }
+.gw-group-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-group-actions { flex:none; display:flex; align-items:center; gap:2px; }
+.gw-group-head { display:flex; align-items:center; gap:4px; padding:4px 10px; cursor:pointer;
   color:var(--dsw-alias-label-secondary); font-size:11px; letter-spacing:.02em; user-select:none; }
-.gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-group-head .gw-caret { width:10px; display:inline-block; text-align:center; opacity:.7; }
+.gw-group-head:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
+/* 缩进只认一条规则：下一级的折叠三角，对齐上一级图标所在的位置。
+   三角宽 12px、间距 4px，所以每层固定 16px。分组标题行内距 10px，
+   它的文字落在 26px，顶层目录的三角也放在 26px，正好压在「未」字下面。 */
+.gw-tree-root { padding-left:26px; }
+.gw-tree-kids { margin-left:16px; }
+.gw-file-lead { width:12px; flex:none; }
+.gw-dir-icon { flex:none; color:var(--dsw-alias-state-warn-primary); }
+.gw-file-icon { flex:none; color:var(--dsw-alias-label-tertiary); }
+.gw-file.gw-tone-new .gw-file-name { color:var(--dsw-alias-state-success-primary); }
+.gw-file.gw-tone-new .gw-file-icon { color:var(--dsw-alias-state-success-primary); }
+.gw-file.gw-tone-mod .gw-file-name { color:var(--dsw-alias-state-warn-primary); }
+.gw-file.gw-tone-mod .gw-file-icon { color:var(--dsw-alias-state-warn-primary); }
+.gw-file.gw-tone-danger .gw-file-name { color:var(--dsw-alias-state-error-primary); }
+.gw-file.gw-tone-danger .gw-file-icon { color:var(--dsw-alias-state-error-primary); }
+.gw-file.gw-tone-danger .gw-file-name { text-decoration:line-through; }
+.gw-tree-dir { cursor:pointer; color:var(--dsw-alias-label-secondary); }
+.gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:11.5px; }
+.gw-tree-dir:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-caret { width:12px; flex:none; color:var(--dsw-alias-label-tertiary); opacity:.9;
+  transition:transform .12s ease; }
+.gw-caret-open { transform:rotate(90deg); }
+.gw-card-wide { max-width:560px; }
+.gw-output-bar { display:flex; align-items:center; gap:6px; padding:4px 10px; flex:none;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-output-exe { font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size:10.5px; color:var(--dsw-alias-label-tertiary); overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; max-width:45%; }
+/* 原生 select 的下拉由浏览器画，位置和外溢都管不住，这里改成自己画一层。 */
+.gw-dd { position:relative; display:inline-flex; }
+.gw-dd-btn { height:22px; box-sizing:border-box; padding:0 6px; border-radius:var(--dsw-radius-xs, 4px);
+  border:1px solid var(--dsw-alias-border-l2); background:transparent; color:var(--dsw-alias-label-secondary);
+  font-size:11px; cursor:pointer; white-space:nowrap; }
+.gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-scrim { position:fixed; inset:0; z-index:70; }
+.gw-dd-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:71; min-width:100%;
+  box-sizing:border-box; padding:4px; border-radius:var(--dsw-radius-md, 12px);
+  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2);
+  box-shadow:0 10px 28px rgba(0, 0, 0, .16); }
+.gw-dd-item { display:block; width:100%; box-sizing:border-box; text-align:left; padding:5px 8px;
+  border:none; background:transparent; border-radius:var(--dsw-radius-sm, 8px);
+  font-size:11px; color:var(--dsw-alias-label-secondary); cursor:pointer; white-space:nowrap; }
+.gw-dd-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent); }
+.gw-dd-item-on { color:var(--dsw-alias-brand-primary); font-weight:600; }
+.gw-output-search { height:22px; width:120px; box-sizing:border-box; padding:0 6px;
+  border-radius:var(--dsw-radius-xs, 4px); border:1px solid var(--dsw-alias-border-l2);
+  background:transparent; color:var(--dsw-alias-label-primary); font-size:11px; outline:none; }
+.gw-output-search::placeholder { color:var(--dsw-alias-label-tertiary); }
+.gw-output-quiet .gw-output-cmd { color:var(--dsw-alias-label-secondary); }
+.gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 14px 16px; }
+.gw-output { display:flex; flex-direction:column;
+  font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size:11.5px; line-height:1.65; }
+/* 每条占一段而不是一行：命令完整换行显示，不省略，便于逐条核对。 */
+.gw-output-item { display:flex; align-items:flex-start; gap:12px; padding:8px 2px;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-output-item:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); }
+.gw-output-meta { flex:none; width:64px; color:var(--dsw-alias-label-tertiary);
+  font-variant-numeric:tabular-nums; }
+.gw-output-body { flex:1 1 auto; min-width:0; }
+.gw-output-cmd { white-space:pre-wrap; word-break:break-all; color:var(--dsw-alias-label-primary); }
+.gw-output-note { color:var(--dsw-alias-label-tertiary); }
+.gw-output-fail .gw-output-cmd { color:var(--dsw-alias-state-error-primary); }
+.gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
+.gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
+.gw-set-opts { display:flex; gap:4px; }
+.gw-set-opt { padding:3px 9px; font-size:11px; border-radius:6px; cursor:pointer;
+  border:1px solid var(--dsw-alias-border-l2); background:transparent;
+  color:var(--dsw-alias-label-secondary); }
+.gw-set-opt:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent); }
+.gw-set-opt-on { border-color:var(--dsw-alias-brand-primary); color:var(--dsw-alias-brand-primary); }
+.gw-files-tab { display:flex; flex-direction:column; height:100%; min-height:0; overflow:auto; }
+.gw-files-tab-bar { display:flex; align-items:center; gap:6px; padding:4px 8px 4px 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-files-tab-title { display:inline-flex; align-items:center; gap:4px;
+  font-size:11px; color:var(--dsw-alias-label-tertiary); }
+.gw-files-tab-add { color:var(--dsw-alias-state-success-primary); }
+.gw-files-tab-del { color:var(--dsw-alias-state-error-primary); }
+.gw-files-tab-head { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-files-tab-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-files-tab-path { font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-files-tab-count { font-size:10.5px; color:var(--dsw-alias-label-tertiary);
+  font-family:var(--ds-font-family-code, ui-monospace, monospace); }
 .gw-count { color:var(--dsw-alias-label-tertiary); }
 .gw-group-actions { margin-left:auto; display:flex; gap:4px; }
 
-.gw-file { display:flex; align-items:center; gap:6px; height:22px; padding:0 10px 0 24px; cursor:pointer;
+.gw-file { display:flex; align-items:center; gap:4px; height:22px; padding:0 10px 0 24px; cursor:pointer;
   white-space:nowrap; }
 .gw-file:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-file-name { overflow:hidden; text-overflow:ellipsis; flex:1 1 auto; direction:rtl; text-align:left; }
@@ -80,10 +204,29 @@ window.__ModuleLoader__.load({
 .gw-ahead { color:var(--dsw-alias-state-success-primary); }
 .gw-behind { color:var(--dsw-alias-state-warn-primary); }
 .gw-spacer { flex:1 1 auto; }
+.gw-bar { display:flex; flex-direction:row; align-items:center; gap:6px;
+  padding:0 0 8px 0; min-height:30px; flex:none; }
+.gw-bar-title { font-size:14px; font-weight:600; color:var(--dsw-alias-label-primary);
+  margin-right:1px; }
+.gw-act { display:flex; align-items:center; justify-content:center; flex:none;
+  width:20px; height:20px; padding:0; border:none; border-radius:4px; background:transparent;
+  color:var(--dsw-alias-label-tertiary); cursor:pointer; opacity:0; }
+.gw-row:hover .gw-act, .gw-file:hover .gw-act, .gw-group-head:hover .gw-act { opacity:1; }
+.gw-act { position:relative; }
+.gw-act::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
+  padding:5px 8px; border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
+  background:var(--dsw-alias-bg-layer-3); color:var(--dsw-alias-label-primary);
+  font-size:11px; line-height:1.3; white-space:nowrap; pointer-events:none;
+  box-shadow:0 2px 8px rgba(0,0,0,.28); opacity:0; visibility:hidden;
+  transition:opacity .12s ease, visibility .12s ease; z-index:10000; }
+.gw-act:hover::after { opacity:1; visibility:visible; }
+.gw-act:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
 .gw-icon { display:flex; align-items:center; justify-content:center; flex:none;
-  width:22px; height:22px; padding:0; border:none; border-radius:5px; background:transparent;
+  width:24px; height:24px; padding:0; border:none; border-radius:5px; background:transparent;
   color:var(--dsw-alias-label-tertiary); cursor:pointer; }
-.gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
+.gw-icon:hover { background:var(--dsw-alias-interactive-bg-hover);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); color:var(--dsw-alias-label-primary); }
 .gw-icon:disabled { opacity:.4; cursor:default; background:transparent; }
 .gw-icon { position:relative; }
 .gw-icon::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); right:-2px;
@@ -198,14 +341,30 @@ window.__ModuleLoader__.load({
 .gw-diff-body { flex:1 1 auto; min-height:0; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   font-size:11px; line-height:1.5; }
 .gw-diff-line { display:flex; white-space:pre; }
+.gw-diff-fold { display:flex; align-items:center; height:22px; padding:0 10px;
+  cursor:pointer; background:color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
+  border-top:1px solid var(--dsw-alias-border-l1);
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-diff-fold:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.gw-diff-fold-text { font-size:11px; color:var(--dsw-alias-label-tertiary); }
+.gw-diff-sign { flex:none; width:12px; margin-right:8px; text-align:center; user-select:none;
+  color:var(--dsw-alias-label-tertiary); }
+.gw-diff-add .gw-diff-sign { color:var(--dsw-alias-state-success-primary); }
+.gw-diff-del .gw-diff-sign { color:var(--dsw-alias-state-error-primary); }
 .gw-diff-gutter { flex:none; width:40px; text-align:right; padding-right:8px; user-select:none;
   color:var(--dsw-alias-label-tertiary); }
 .gw-diff-text { flex:1 1 auto; padding-right:12px; }
-.gw-diff-add { background:var(--dsw-alias-file-diff-added-bg); }
-.gw-diff-del { background:var(--dsw-alias-file-diff-deleted-bg); }
+/* 底色压到很淡、文字保持默认前景色，向 VSCode 那种柔和观感靠拢 */
+.gw-diff-add { background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 7%, transparent); }
+.gw-diff-del { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, transparent); }
 .gw-diff-hunk { color:var(--dsw-alias-label-tertiary); background:var(--dsw-alias-bg-layer-2); }
-.gw-diff-add .gw-diff-text { color:var(--dsw-alias-state-success-primary); }
-.gw-diff-del .gw-diff-text { color:var(--dsw-alias-state-error-primary); }
+.gw-diff-add .gw-diff-text, .gw-diff-del .gw-diff-text { color:var(--dsw-alias-label-primary); }
+/* 语法着色：每类各占一个色相，饱和度由主题语义色本身决定，混合比例只留一点点底色避免与正文完全脱开。 */
+.gw-tok-com { color:color-mix(in srgb, var(--dsw-alias-label-tertiary) 92%, var(--dsw-alias-state-success-primary)); font-style:italic; }
+.gw-tok-str { color:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 88%, var(--dsw-alias-label-primary)); }
+.gw-tok-num { color:color-mix(in srgb, var(--dsw-alias-state-success-primary) 85%, var(--dsw-alias-label-primary)); }
+.gw-tok-key { color:color-mix(in srgb, var(--dsw-alias-state-business-primary) 88%, var(--dsw-alias-label-primary)); }
+.gw-tok-fn { color:color-mix(in srgb, var(--dsw-alias-brand-primary) 85%, var(--dsw-alias-label-primary)); }
 
 .gw-empty { padding:24px 12px; text-align:center; color:var(--dsw-alias-label-tertiary); }
 /* 错误条浮在面板上方，不占布局空间——否则它一出现就把下面的提交框顶下去。 */
@@ -231,35 +390,59 @@ window.__ModuleLoader__.load({
   from { opacity:1; transform:none; }
   to { opacity:0; transform:translateY(-4px) scale(.99); }
 }
-.gw-menu { position:fixed; z-index:9999; min-width:190px; padding:4px; border-radius:8px;
-  background:var(--dsw-alias-bg-layer-3); border:1px solid var(--dsw-alias-border-l2);
-  box-shadow:0 8px 24px rgba(0,0,0,.28); }
-.gw-menu-item { display:flex; align-items:center; height:26px; padding:0 10px; border-radius:5px;
+/* 浮层尺寸照宿主的菜单与对话框来：菜单四像素内距、项四乘七、圆角用中号；
+   对话框用面板级圆角、无边框、二十像素横向内距。 */
+.gw-menu { position:fixed; z-index:9999; min-width:156px; padding:4px;
+  border-radius:var(--dsw-radius-xl, 20px);
+  background:var(--dsw-alias-bg-layer-3);
+  border:.5px solid var(--dsw-alias-border-l2);
+  box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
+.gw-menu-item { display:flex; align-items:center; padding:6px 8px; line-height:18px;
+  border-radius:var(--dsw-radius-md, 12px);
+  font-size:calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
   cursor:pointer; white-space:nowrap; color:var(--dsw-alias-label-primary); }
 .gw-menu-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-check { display:flex; align-items:center; gap:6px; margin-top:2px;
-  font-size:11.5px; color:var(--dsw-alias-label-secondary); cursor:pointer; }
-.gw-check input { width:13px; height:13px; margin:0; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
-.gw-note { font-size:11.5px; line-height:1.6; color:var(--dsw-alias-label-secondary);
+  font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); cursor:pointer; }
+.gw-check input { width:15px; height:15px; margin:0; accent-color:var(--dsw-alias-brand-primary); cursor:pointer; }
+.gw-note { font-size:14px; line-height:22px; color:var(--dsw-alias-label-secondary);
   margin-bottom:8px; white-space:pre-wrap; }
 .gw-btn-danger { background:var(--dsw-alias-state-error-primary); color:#fff; border-color:transparent; }
 .gw-btn-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 85%, #000); }
 .gw-menu-danger { color:var(--dsw-alias-state-error-primary); }
 .gw-menu-danger:hover { background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent); }
-.gw-menu-sep { height:1px; margin:4px 6px; background:var(--dsw-alias-border-l1); }
-.gw-scrim { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.32);
-  display:flex; align-items:center; justify-content:center; padding:24px; }
-.gw-card { width:100%; max-width:380px; max-height:100%; display:flex; flex-direction:column;
-  border-radius:12px; border-radius:var(--dsw-radius-md, 12px);
-  background:var(--dsw-alias-bg-layer-3); border:1px solid var(--dsw-alias-border-l2);
-  box-shadow:0 16px 40px rgba(0,0,0,.34); overflow:hidden; }
-.gw-card-head { display:flex; align-items:center; gap:8px; padding:10px 12px;
-  border-bottom:1px solid var(--dsw-alias-border-l1); font-size:12px; font-weight:600;
-  color:var(--dsw-alias-label-primary); }
-.gw-card-body { flex:1 1 auto; min-height:0; overflow:auto; padding:6px 0; }
-.gw-card-foot { flex:none; padding:8px 12px; border-top:1px solid var(--dsw-alias-border-l1);
-  display:flex; justify-content:flex-end; gap:6px; }
-.gw-remote { display:flex; align-items:center; gap:8px; padding:6px 12px; }
+.gw-menu-item { position:relative; }
+.gw-menu-label { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-menu-parent > .gw-menu-arrow { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; }
+.gw-menu-off { opacity:.45; cursor:default; }
+.gw-menu-sub { display:none; position:absolute; left:calc(100% + 10px); bottom:-4px; min-width:163px;
+  padding:4px; border-radius:var(--dsw-radius-xl, 20px); border:.5px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-3);
+  box-shadow:var(--dsw-elevation-prominent, 0 12px 28px rgba(0,0,0,.3)); z-index:20; }
+.gw-menu-parent:hover > .gw-menu-sub { display:block; }
+.gw-menu-sep { height:1px; margin:4px 7px; background:var(--dsw-alias-border-l1); }
+.gw-scrim { position:fixed; inset:0; z-index:9998; background:var(--dsw-alias-bg-mask-1, rgba(0,0,0,.32));
+  backdrop-filter:var(--dsw-mask-blur); display:flex; align-items:center; justify-content:center; padding:24px; }
+.gw-card { width:100%; max-width:min(380px, 100%); max-height:100%; box-sizing:border-box;
+  display:flex; flex-direction:column; overflow:hidden; padding:0 0 24px;
+  border-radius:var(--dsw-radius-panel, 28px); border:none;
+  background:var(--dsw-alias-bg-layer-2); box-shadow:var(--dsw-elevation-prominent); }
+.gw-card-head { display:flex; align-items:center; gap:8px; padding:22px 14px 12px 24px;
+  font-size:16px; line-height:24px; font-weight:500; color:var(--dsw-alias-label-primary); }
+.gw-card-title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-card-close { flex:none; display:flex; align-items:center; justify-content:center;
+  width:28px; height:28px; padding:0; border:none; border-radius:var(--dsw-radius-sm, 8px);
+  background:transparent; color:var(--dsw-alias-label-tertiary); cursor:pointer;
+  font-size:16px; line-height:1; }
+.gw-card-close:hover { background:var(--dsw-alias-interactive-bg-hover); color:var(--dsw-alias-label-primary); }
+.gw-card-body { flex:1 1 auto; min-height:0; overflow:auto; margin-top:8px; padding:0 24px;
+  font-size:14px; line-height:22px; color:var(--dsw-alias-label-primary); }
+.gw-card-foot { flex:none; padding:0 24px; margin-top:20px;
+  display:flex; justify-content:flex-end; gap:8px; }
+/* 对话框里的按钮单独放大：外壳上的按钮要跟着列表条走，不能一起吃这套尺寸。 */
+.gw-card .gw-btn { height:32px; padding:0 14px; font-size:13px; border-radius:var(--dsw-radius-md, 12px); }
+.gw-card .gw-btn-primary { border:1px solid transparent; }
+.gw-remote { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--dsw-radius-md, 12px); }
 .gw-remote:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .gw-remote-name { flex:none; font-size:11.5px; font-weight:600; color:var(--dsw-alias-label-primary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
@@ -267,12 +450,15 @@ window.__ModuleLoader__.load({
   font-size:10.5px; color:var(--dsw-alias-label-tertiary);
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-remote-actions { flex:none; display:flex; gap:2px; }
-.gw-form { display:flex; flex-direction:column; gap:8px; padding:10px 12px; }
+.gw-form { display:flex; flex-direction:column; gap:14px; }
+.gw-remote-list { display:flex; flex-direction:column; gap:2px; }
+.gw-remote-main { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
+.gw-card-actions { display:flex; gap:8px; }
 .gw-field { display:flex; flex-direction:column; gap:3px; }
-.gw-field > span { font-size:10.5px; color:var(--dsw-alias-label-tertiary); }
-.gw-input { height:26px; padding:0 8px; font-size:11.5px; box-sizing:border-box;
-  border-radius:6px; border-radius:var(--dsw-radius-sm, 8px);
-  border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-1);
+.gw-field > span { font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
+.gw-input { height:34px; padding:0 12px; font-size:13px; line-height:1.5; box-sizing:border-box;
+  border-radius:var(--dsw-radius-md, 12px);
+  border:.5px solid var(--dsw-alias-border-l4); background:var(--dsw-alias-bg-layer-3);
   color:var(--dsw-alias-label-primary); outline:none;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
 .gw-input:focus { border-color:var(--dsw-alias-brand-primary); }
@@ -295,7 +481,7 @@ window.__ModuleLoader__.load({
       zh: {
         title: 'Git',
         description: '提交图与变更管理',
-        commitPlaceholder: '提交信息',
+        commitPlaceholder: '写点提交信息…',
         commit: '提交',
         commitAmend: '修补上一次提交',
         staged: '已暂存',
@@ -313,8 +499,62 @@ window.__ModuleLoader__.load({
         push: '推送',
         publish: '发布分支',
         syncRunning: '正在执行…',
+        treeView: '以树形式查看',
+        flatView: '以列表形式查看',
+        settings: '设置',
+        pollLabel: '自动刷新',
+        pageLabel: '每页条数',
+        off: '关闭',
+        clone: '克隆…',
+        cloneUrl: '从远程地址克隆',
+        cloneTo: '克隆到当前工作区',
+        checkoutTo: '签出到…',
+        checkoutBranch: '切换到分支…',
+        checkoutTag: '切换到标签…',
+        fetch: '抓取',
+        commitGroup: '提交',
+        commitStaged: '提交已暂存的更改',
+        commitAll: '提交全部更改',
+        amendLast: '修补上一次提交',
+        undoLastCommit: '撤销上一次提交',
+        changesGroup: '更改',
+        filesTabTitle: '差异',
+        openAllDiffs: '打开全部差异',
+        filesUnit: '个文件',
+        unmodifiedLines: '行未改动',
+    allLevels: '全部级别',
+    allKinds: '全部类别',
+    searchOutput: '搜索命令或输出',
+        stageAllChanges: '暂存全部更改',
+        unstageAllChanges: '取消暂存全部',
+        discardAllChanges: '撤销所有更改',
+        syncGroup: '拉取、推送',
+        pullThenPush: '先拉取再推送',
+        branchesGroup: '分支',
+        createBranchItem: '新建分支…',
+        deleteBranchItem: '删除分支…',
+        renameBranchItem: '重命名分支…',
+        remotesGroup: '远程',
+        addRemoteItem: '添加远程…',
+        removeRemoteItem: '移除远程…',
+        editRemoteItem: '编辑远程…',
+        stashGroup: '存储',
+        stashSaveItem: '保存当前更改为存储',
+        stashApplyItem: '应用最近的存储',
+        stashDropItem: '丢弃最近的存储',
+        tagsGroup: '标记',
+        tagCreateItem: '新建标签…',
+        tagDeleteItem: '删除标签…',
+        showOutput: '显示 Git 输出',
         remotes: '远程仓库',
         openInTerminal: '在终端打开仓库',
+        outputEmpty: '还没有执行过命令',
+        checkoutHint: '填分支名、标签名或提交哈希',
+        refLabel: '目标',
+        tagHint: '标记会打在最新一次提交上',
+        openFile: '打开文件',
+        ignoreFile: '加入忽略',
+        ignoreAll: '全部加入忽略',
         remoteEmpty: '还没有配置远程仓库',
         remoteAdd: '添加远程',
         remoteEdit: '编辑',
@@ -328,9 +568,9 @@ window.__ModuleLoader__.load({
         unstageAll: '全部取消暂存',
         stage: '暂存',
         unstage: '取消暂存',
-        discard: '放弃更改',
+        discard: '撤销更改',
         discardConfirm: '确定放弃对 {path} 的更改？此操作无法撤销。',
-        discardAllConfirm: '确定放弃全部未暂存的更改？此操作无法撤销。',
+        discardAllConfirm: '确定撤销全部未暂存的更改？此操作无法撤销。',
         noChanges: '工作区干净',
         uncommitted: '未提交的更改',
         noCommits: '还没有提交',
@@ -405,8 +645,62 @@ window.__ModuleLoader__.load({
         push: 'Push',
         publish: 'Publish branch',
         syncRunning: 'Running…',
+        treeView: 'View as tree',
+        flatView: 'View as list',
+        settings: 'Settings',
+        pollLabel: 'Auto refresh',
+        pageLabel: 'Rows per page',
+        off: 'Off',
+        clone: 'Clone…',
+        cloneUrl: 'Clone from URL',
+        cloneTo: 'Clone into workspace',
+        checkoutTo: 'Checkout to…',
+        checkoutBranch: 'Checkout branch…',
+        checkoutTag: 'Checkout tag…',
+        fetch: 'Fetch',
+        commitGroup: 'Commit',
+        commitStaged: 'Commit staged',
+        commitAll: 'Commit all',
+        amendLast: 'Amend last commit',
+        undoLastCommit: 'Undo last commit',
+        changesGroup: 'Changes',
+        filesTabTitle: 'Diffs',
+        openAllDiffs: 'Open all diffs',
+        filesUnit: 'files',
+        unmodifiedLines: 'unmodified lines',
+    allLevels: 'All levels',
+    allKinds: 'All kinds',
+    searchOutput: 'Search command or output',
+        stageAllChanges: 'Stage all changes',
+        unstageAllChanges: 'Unstage all changes',
+        discardAllChanges: 'Discard all changes',
+        syncGroup: 'Pull, Push',
+        pullThenPush: 'Pull then push',
+        branchesGroup: 'Branch',
+        createBranchItem: 'Create branch…',
+        deleteBranchItem: 'Delete branch…',
+        renameBranchItem: 'Rename branch…',
+        remotesGroup: 'Remote',
+        addRemoteItem: 'Add remote…',
+        removeRemoteItem: 'Remove remote…',
+        editRemoteItem: 'Edit remote…',
+        stashGroup: 'Stash',
+        stashSaveItem: 'Stash changes',
+        stashApplyItem: 'Apply latest stash',
+        stashDropItem: 'Drop latest stash',
+        tagsGroup: 'Tag',
+        tagCreateItem: 'Create tag…',
+        tagDeleteItem: 'Delete tag…',
+        showOutput: 'Show Git output',
         remotes: 'Remotes',
         openInTerminal: 'Open repository in terminal',
+        outputEmpty: 'No commands yet',
+        checkoutHint: 'Branch, tag, or commit hash',
+        refLabel: 'Target',
+        tagHint: 'The tag is created on the latest commit',
+        openFile: 'Open file',
+        ignoreFile: 'Add to .gitignore',
+        ignoreAll: 'Add all to .gitignore',
         remoteEmpty: 'No remotes configured',
         remoteAdd: 'Add remote',
         remoteEdit: 'Edit',
@@ -573,6 +867,18 @@ window.__ModuleLoader__.load({
       ].join('\u0000')
     }
 
+    /**
+     * 图上每一行的列与颜色。
+     *
+     * 规则来自需求本身：
+     * - 主分支独占第 0 列。
+     * - 一条分支从它的尖端沿第一父一路往下走，撞到已经属于别人的提交就停。
+     *   分出来的那一刻就定下了自己站哪一列，不需要看下面还有什么，所以
+     *   只加载最近一百条和加载全部历史算出来的列完全一致。
+     * - 分叉一律向右：新分支的列总在父分支的右边。
+     * - 每条分支独占一列，因此不会出现两段线接成一条直线的错觉。
+     * - 颜色跟着分支走，并且和父分支不同色。
+     */
     function computeLayout(entries) {
       if (entries.length === 0) {
         return { rowLane: [], rowColor: [], laneCount: 1, edges: [], rowOfHash: new Map() }
@@ -581,176 +887,146 @@ window.__ModuleLoader__.load({
       const rowOfHash = new Map()
       for (let i = 0; i < entries.length; i++) rowOfHash.set(entries[i].hash, i)
 
-      let trunkTip = findTrunkTip(entries)
-      if (trunkTip === null) trunkTip = entries[0].hash
+      const refsOf = (index) => (Array.isArray(entries[index].refs) ? entries[index].refs : [])
+      const parentsOf = (index) => (Array.isArray(entries[index].parents) ? entries[index].parents : [])
 
-      // 哪些提交是某个分支的尖端——链在这些地方必须断开，
-      // 否则从 main 新开的分支会顺着第一父一路并进 main 那条线，看着是一根直线。
-      const isTip = new Array(entries.length).fill(false)
-      for (let i = 0; i < entries.length; i++) {
-        const refs = Array.isArray(entries[i].refs) ? entries[i].refs : []
-        for (let r = 0; r < refs.length; r++) {
-          const type = refs[r] && refs[r].type
-          if (type === 'branch' || type === 'remote' || type === 'head') { isTip[i] = true; break }
+      // 主干：main / master 优先，其次是当前检出的分支，都没有就取第一行。
+      const trunkTip = findTrunkTip(entries)
+      let trunkRow = trunkTip === null ? undefined : rowOfHash.get(trunkTip)
+      if (trunkRow === undefined) {
+        for (let i = 0; i < entries.length; i++) {
+          let hit = false
+          for (const ref of refsOf(i)) {
+            if (ref !== null && ref !== undefined && ref.type === 'head') { hit = true; break }
+          }
+          if (hit) { trunkRow = i; break }
         }
       }
+      if (trunkRow === undefined) trunkRow = 0
 
-      // 一、切链：一条链从它的起点沿第一父一路往下走，撞到已经有主的提交就停。
-      // 建链的次序是 主干 → 各分支尖端 → 其余提交：先建的分支先占住自己的历史，
-      // 后建的撞上去就停。所以一条分支从头到尾是一条链、一个颜色，
-      // 中途换到哪一列都还是它自己，不会在分叉口断成两种颜色。
-      const chainOf = new Array(entries.length).fill(-1)
-      const chains = []
-      const createChain = (startRow) => {
-        const chain = { first: startRow, last: startRow, lane: 0, color: 0 }
-        let row = startRow
-        while (row >= 0 && chainOf[row] < 0) {
-          chainOf[row] = chains.length
-          chain.last = row
-          const parents = Array.isArray(entries[row].parents) ? entries[row].parents : []
+      // 一、认领分支。每条分支从自己的尖端往下走，撞上有主的提交就停；
+      // 停下时脚踩的那一行属于父分支，这就是「从哪儿分出来的」。
+      const owner = new Array(entries.length).fill(-1)
+      const branches = []
+
+      const claim = (tipRow, parentBranch) => {
+        const index = branches.length
+        branches.push({ tip: tipRow, last: tipRow, parent: parentBranch, lane: 0, color: 0 })
+        let row = tipRow
+        let stop = -1
+        while (row >= 0 && row < entries.length && owner[row] < 0) {
+          owner[row] = index
+          branches[index].last = row
+          const parents = parentsOf(row)
           if (parents.length === 0) break
           const next = rowOfHash.get(parents[0])
           if (next === undefined || next <= row) break
           row = next
         }
-        chains.push(chain)
+        // 撞上别人的那一行，就是这条分支的父分支
+        if (row >= 0 && row < entries.length && owner[row] >= 0 && owner[row] !== index) stop = owner[row]
+        if (stop >= 0) branches[index].parent = stop
+        return index
       }
-      const trunkRow = rowOfHash.get(trunkTip)
-      if (trunkRow !== undefined) createChain(trunkRow)
-      for (let i = 0; i < entries.length; i++) if (isTip[i] && chainOf[i] < 0) createChain(i)
-      for (let i = 0; i < entries.length; i++) if (chainOf[i] < 0) createChain(i)
 
-      // 二、分列：主分支锁第 0 列；其余的从父列右边起，往右找第一条
-      // 「这条链的起点落在该列上一段结束之后」的道，找不到就新开一列。
-      const trunkChain = trunkRow === undefined ? -1 : chainOf[trunkRow]
+      const trunkBranch = claim(trunkRow, -1)
+      branches[trunkBranch].lane = 0
 
-      const laneLast = []
-      const laneOfRow = new Array(entries.length).fill(-1)
-
-      const fillRows = (chainIndex) => {
-        const chain = chains[chainIndex]
+      // 尖端按行号从上到下处理：上面的分支先占位，下面的只能往右让，所以分叉永远向右。
+      // 真分支先认领，stash 与标签后认领——否则 stash 会顺着第一父一路往下，
+      // 把它所属分支的提交全吞进自己这条链里。
+      const tipRank = (row) => {
+        let rank = -1
+        for (const ref of refsOf(row)) {
+          if (ref === null || ref === undefined) continue
+          const type = ref.type
+          if (type === 'branch' || type === 'remote' || type === 'head') return 0
+          if (type === 'stash' || type === 'tag') rank = 1
+        }
+        return rank
+      }
+      for (const pass of [0, 1]) {
         for (let i = 0; i < entries.length; i++) {
-          if (chainOf[i] === chainIndex) laneOfRow[i] = chain.lane
+          if (owner[i] >= 0) continue
+          if (tipRank(i) === pass) claim(i, -1)
         }
       }
 
-      // 取色：颜色和列是两回事。每条链单独领一个颜色槽——从左往右找第一个
-      // 「上次用到行 < 本链起点」的槽，找不到就新开一个，记下本链的结束行。
-      // 所以同一条列上的两条链可以不同色，被让出来的槽也会被后面的链重新领走。
-      // 唯一的附加约束：不能领到父链那个槽，分叉出来的两条分支必须不同色。
-      const colourLast = []
-      const laneColour = []
-      const pickColour = (firstRow, lastRow, lane, fatherSlot) => {
-        const free = (from) => {
-          let slot = from
-          while (slot < colourLast.length && colourLast[slot] >= firstRow) slot += 1
-          return slot
-        }
-        const taken = (slot) => slot === fatherSlot || slot === laneColour[lane]
-        let slot = free(0)
-        while (taken(slot)) slot = free(slot + 1)
-        if (slot >= colourLast.length) colourLast.push(-1)
-        colourLast[slot] = lastRow
-        laneColour[lane] = slot
-        return slot
+      // 二、还没归属的提交：跟着它的第一父；父也没有就并进主干。
+      // 从下往上补，保证父先有主。
+      for (let i = entries.length - 1; i >= 0; i--) {
+        if (owner[i] >= 0) continue
+        const parents = parentsOf(i)
+        const parentRow = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
+        owner[i] = parentRow !== undefined && owner[parentRow] >= 0 ? owner[parentRow] : trunkBranch
       }
 
-      const takeLane = (chainIndex) => {
-        const chain = chains[chainIndex]
-        if (chainIndex === trunkChain) {
-          if (laneLast.length === 0) laneLast.push(chain.last)
-          laneLast[0] = Math.max(laneLast[0], chain.last)
-          chain.lane = 0
-          chain.color = pickColour(chain.first, chain.last, 0, -1)
-          fillRows(chainIndex)
-          return
-        }
-        // 分支一律向右分叉：新链要落在它分出去的那条分支所在列的右边，
-        // 只有合并的连线才会往左收。取链尾的父提交——那才是它接回主线的位置，
-        // 链首的父通常就在本链内部。
-        const tailParents = Array.isArray(entries[chain.last].parents) ? entries[chain.last].parents : []
-        const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
-        const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
-        const fatherLane = fatherChain >= 0 && fatherChain !== chainIndex ? laneOfRow[fatherRow] : -1
-        const fatherColor = fatherChain >= 0 && fatherChain !== chainIndex ? chains[fatherChain].color : -1
-        const start = Math.max(1, fatherLane + 1)
+      // 三、分列。从父分支右边一格起往右找：这一列上一条分支已经在自己上方收尾，
+      // 就说明两段线不会连在一起，可以复用；否则再往右让一格。
+      const laneLast = [branches[trunkBranch].last]
+      const laneColor = [0]
+      let laneCount = 1
+      for (let index = 0; index < branches.length; index++) {
+        if (index === trunkBranch) continue
+        const branch = branches[index]
+        const parent = branch.parent
+        const base = parent >= 0 ? branches[parent].lane : 0
+        const parentColor = parent >= 0 ? branches[parent].color : -1
+        let lane = base + 1
+        while (laneLast[lane] !== undefined && laneLast[lane] >= branch.tip) lane += 1
+        laneLast[lane] = branch.last
+        branch.lane = lane
+        if (lane + 1 > laneCount) laneCount = lane + 1
 
-        for (let j = start; j < laneLast.length; j++) {
-          if (chain.first > laneLast[j]) {
-            chain.lane = j
-            chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
-            laneLast[j] = chain.last
-            fillRows(chainIndex)
-            return
-          }
+        // 四、配色跟着分支走：避开父分支那一色，也避开同一列上一条分支那一色。
+        let color = index % LANE_COLORS.length
+        let guard = 0
+        while (guard < LANE_COLORS.length && (color === parentColor || color === laneColor[lane])) {
+          color = (color + 1) % LANE_COLORS.length
+          guard += 1
         }
-        while (laneLast.length < start) laneLast.push(-1)
-        laneLast.push(chain.last)
-        chain.lane = laneLast.length - 1
-        chain.color = pickColour(chain.first, chain.last, chain.lane, fatherColor)
-        fillRows(chainIndex)
+        laneColor[lane] = color
+        branch.color = color
       }
-
-      // 链的层级：主干为 0，直接从主干分出来的为 1，再往下递增。
-      // 按层级从浅到深分配，子链落位时父链的列已经定好，
-      // 所以「分出来的链必须在父的右边」是算出来的，不是事后挪出来的。
-      const depth = new Array(chains.length).fill(0)
-      for (let round = 0; round < chains.length; round++) {
-        let changed = false
-        for (let i = 0; i < chains.length; i++) {
-          const tailParents = Array.isArray(entries[chains[i].last].parents) ? entries[chains[i].last].parents : []
-          const fatherRow = tailParents.length > 0 ? rowOfHash.get(tailParents[0]) : undefined
-          const fatherChain = fatherRow === undefined ? -1 : chainOf[fatherRow]
-          if (fatherChain < 0 || fatherChain === i) continue
-          if (depth[i] < depth[fatherChain] + 1) {
-            depth[i] = depth[fatherChain] + 1
-            changed = true
-          }
-        }
-        if (!changed) break
-      }
-
-      const rest = []
-      for (let i = 0; i < chains.length; i++) if (i !== trunkChain) rest.push(i)
-      rest.sort((a, b) => (depth[a] - depth[b]) || (chains[a].first - chains[b].first))
-      const order = trunkChain >= 0 ? [trunkChain].concat(rest) : rest
-      for (const index of order) takeLane(index)
 
       const rowLane = new Array(entries.length).fill(0)
       const rowColor = new Array(entries.length).fill(0)
       for (let i = 0; i < entries.length; i++) {
-        const chain = chains[chainOf[i]]
-        rowLane[i] = chain.lane
-        rowColor[i] = chain.color
+        const branch = branches[owner[i]]
+        rowLane[i] = branch.lane
+        rowColor[i] = branch.color
       }
 
-      // 未提交的改动跟它所属的分支同列同色，不单独占道
-      for (let i = 0; i < entries.length; i++) {
-        if (entries[i].uncommitted !== true) continue
-        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
-        const row = parents.length > 0 ? rowOfHash.get(parents[0]) : undefined
-        if (row !== undefined) {
-          rowLane[i] = rowLane[row]
-          rowColor[i] = rowColor[row]
-        }
-      }
-
-      let laneCount = 1
-      for (let i = 0; i < rowLane.length; i++) if (rowLane[i] + 1 > laneCount) laneCount = rowLane[i] + 1
-
+      // 五、连线。
       const edges = []
       for (let i = 0; i < entries.length; i++) {
-        const parents = Array.isArray(entries[i].parents) ? entries[i].parents : []
+        const parents = parentsOf(i)
         for (let p = 0; p < parents.length; p++) {
-          const row = rowOfHash.get(parents[p])
-          if (row === undefined) continue
+          const target = rowOfHash.get(parents[p])
+          if (target === undefined) {
+            // 父提交还没加载进来：把线一路画到窗口末尾，别让它凭空断掉。
+            // 只画第一父，第二父断了会误导主线。
+            if (p === 0) {
+              edges.push({
+                from: i,
+                to: entries.length,
+                fromLane: rowLane[i],
+                toLane: rowLane[i],
+                fromColor: rowColor[i],
+                toColor: rowColor[i],
+                primary: true,
+                dangling: true,
+              })
+            }
+            continue
+          }
           edges.push({
             from: i,
-            to: row,
+            to: target,
             fromLane: rowLane[i],
-            toLane: rowLane[row],
+            toLane: rowLane[target],
             fromColor: rowColor[i],
-            toColor: rowColor[row],
+            toColor: rowColor[target],
             primary: p === 0,
           })
         }
@@ -805,41 +1081,151 @@ window.__ModuleLoader__.load({
       return 'gw-code gw-code-idx'
     }
 
+    /* 轻量着色：只认注释、字符串、数字、关键字、函数名，够分辨就行，不做真正的语法解析。 */
+    const HL_KEYWORDS = new Set([
+      'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while',
+      'class', 'new', 'import', 'export', 'from', 'await', 'async', 'try', 'catch',
+      'finally', 'throw', 'typeof', 'instanceof', 'extends', 'implements', 'interface',
+      'type', 'enum', 'public', 'private', 'protected', 'static', 'readonly', 'def',
+      'null', 'undefined', 'true', 'false', 'this', 'super', 'in', 'of', 'do',
+      'switch', 'case', 'default', 'break', 'continue', 'delete', 'void', 'yield',
+      'as', 'is', 'and', 'or', 'not', 'elif', 'lambda', 'pass', 'raise', 'with',
+    ])
+
+    function highlightLine(text, state) {
+      const parts = []
+      let plain = ''
+      let index = 0
+      const flush = () => {
+        if (plain !== '') { parts.push({ text: plain, cls: '' }); plain = '' }
+      }
+      const push = (value, cls) => { flush(); parts.push({ text: value, cls: cls }) }
+
+      while (index < text.length) {
+        if (state.block === true) {
+          const end = text.indexOf('*/', index)
+          if (end < 0) { push(text.slice(index), 'gw-tok-com'); index = text.length; break }
+          push(text.slice(index, end + 2), 'gw-tok-com')
+          index = end + 2
+          state.block = false
+          continue
+        }
+        const rest = text.slice(index)
+        if (rest.startsWith('//') || (rest.startsWith('#') && (index === 0 || /\s/.test(text[index - 1])))) {
+          push(rest, 'gw-tok-com')
+          break
+        }
+        if (rest.startsWith('/*')) {
+          const end = text.indexOf('*/', index + 2)
+          if (end < 0) { push(rest, 'gw-tok-com'); state.block = true; break }
+          push(text.slice(index, end + 2), 'gw-tok-com')
+          index = end + 2
+          continue
+        }
+        const first = text[index]
+        if (first === '"' || first === "'" || first === '`') {
+          let cursor = index + 1
+          while (cursor < text.length) {
+            if (text[cursor] === '\\') { cursor += 2; continue }
+            if (text[cursor] === first) { cursor += 1; break }
+            cursor += 1
+          }
+          push(text.slice(index, cursor), 'gw-tok-str')
+          index = cursor
+          continue
+        }
+        if (/[0-9]/.test(first) && (index === 0 || /[^A-Za-z0-9_$]/.test(text[index - 1]))) {
+          const match = /^[0-9][0-9a-zA-Z_.]*/.exec(rest)
+          push(match[0], 'gw-tok-num')
+          index += match[0].length
+          continue
+        }
+        if (/[A-Za-z_$]/.test(first)) {
+          const match = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(rest)
+          const word = match[0]
+          const after = text[index + word.length]
+          if (HL_KEYWORDS.has(word)) push(word, 'gw-tok-key')
+          else if (after === '(') push(word, 'gw-tok-fn')
+          else plain += word
+          index += word.length
+          continue
+        }
+        plain += first
+        index += 1
+      }
+      flush()
+      return parts
+    }
+
     function splitDiff(text) {
       const rows = []
       const lines = String(text === null || text === undefined ? '' : text).split('\n')
       let oldNo = 0
       let newNo = 0
       let inHunk = false
+      /* 跨行注释要连续着色，所以状态在整篇里共用一份。 */
+      const hlState = { block: false }
       for (const line of lines) {
+        /* 文件头那一堆（diff --git、index、---、+++、mode 之类）在单文件视图里
+           是重复信息，文件路径已经在标签页标题上了，全部丢掉。 */
         if (line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('--- ') ||
             line.startsWith('+++ ') || line.startsWith('new file') || line.startsWith('deleted file') ||
             line.startsWith('old mode') || line.startsWith('new mode') || line.startsWith('similarity') ||
             line.startsWith('rename ') || line.startsWith('Binary files')) {
-          if (line.startsWith('--- ')) continue
-          if (line.startsWith('+++ ')) continue
-          if (line.startsWith('diff --git')) rows.push({ type: 'meta', text: line })
           continue
         }
+        /* 分节标记只用来对齐行号，本身不显示。 */
         if (line.startsWith('@@')) {
           const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line)
           if (match !== null) { oldNo = Number(match[1]); newNo = Number(match[2]) }
           inHunk = true
-          rows.push({ type: 'hunk', text: line })
           continue
         }
         if (!inHunk) {
-          if (line !== '') rows.push({ type: 'meta', text: line })
+          if (line !== '') rows.push({ type: 'meta', sign: '', text: line })
           continue
         }
-        if (line.startsWith('+')) { rows.push({ type: 'add', text: line, no: String(newNo) }); newNo += 1; continue }
-        if (line.startsWith('-')) { rows.push({ type: 'del', text: line, no: String(oldNo) }); oldNo += 1; continue }
-        if (line.startsWith('\\')) { rows.push({ type: 'meta', text: line }); continue }
-        rows.push({ type: 'ctx', text: line, no: String(newNo) })
+        /* 增删符号单独成列，正文从第二个字符开始，不再挤在内容里。 */
+        if (line.startsWith('+')) { const body = line.slice(1); rows.push({ type: 'add', sign: '+', text: body, tokens: highlightLine(body, hlState), no: String(newNo) }); newNo += 1; continue }
+        if (line.startsWith('-')) { const body = line.slice(1); rows.push({ type: 'del', sign: '−', text: body, tokens: highlightLine(body, hlState), no: String(oldNo) }); oldNo += 1; continue }
+        if (line.startsWith('\\')) { rows.push({ type: 'meta', sign: '', text: line }); continue }
+        const body = line.slice(1)
+        rows.push({ type: 'ctx', sign: '', text: body, tokens: highlightLine(body, hlState), no: String(newNo) })
         oldNo += 1
         newNo += 1
       }
       return rows
+    }
+
+    /**
+     * 把连续的未改动行折起来，只在改动前后各留三行。
+     * 展开状态按「这段起点在整篇里的下标」记，所以折叠/展开是纯前端的事，
+     * 不用重新请求——这也是后端要 full 上下文的原因。
+     */
+    function foldRows(rows, unfolded) {
+      const out = []
+      let i = 0
+      while (i < rows.length) {
+        if (rows[i].type !== 'ctx') { out.push(rows[i]); i += 1; continue }
+        let j = i
+        while (j < rows.length && rows[j].type === 'ctx') j += 1
+        const run = j - i
+        const head = Math.min(3, run)
+        const tail = Math.min(3, Math.max(0, run - head))
+        const hidden = run - head - tail
+        for (let k = 0; k < head; k++) out.push(rows[i + k])
+        if (hidden > 0) {
+          const key = 'f' + String(i)
+          if (unfolded[key] === true) {
+            for (let k = 0; k < hidden; k++) out.push(rows[i + head + k])
+          } else {
+            out.push({ type: 'fold', count: hidden, key: key })
+          }
+        }
+        for (let k = Math.max(head, run - tail); k < run; k++) out.push(rows[i + k])
+        i = j
+      }
+      return out
     }
 
     /* ------------------------------------------------------------------ */
@@ -924,6 +1310,140 @@ window.__ModuleLoader__.load({
 
 
     /** 远程仓库管理：列出、编辑、删除、新增。地址只做长度与破折号校验，不做可达性探测。 */
+    /** 下半区的「显示 Git 输出」：最近执行过的命令，最新的在前，和差异页同一个位置。 */
+    /* 菜单贴着按钮往下展开，右边缘对齐，不会往左压到内容上。 */
+    function DropDown(props) {
+      const [open, setOpen] = useState(false)
+      const current = props.options.find((option) => option.value === props.value)
+      return E('span', { className: 'gw-dd' },
+        E('button', {
+          className: 'gw-dd-btn',
+          onClick: () => setOpen(open === false),
+        }, (current === undefined ? props.value : current.label) + ' \u25BE'),
+        open === false ? null : E('div', { className: 'gw-dd-scrim', onClick: () => setOpen(false) }),
+        open === false ? null : E('div', { className: 'gw-dd-menu' },
+          props.options.map((option) => E('button', {
+            key: option.value,
+            className: 'gw-dd-item' + (option.value === props.value ? ' gw-dd-item-on' : ''),
+            onClick: () => {
+              setOpen(false)
+              props.onPick(option.value)
+            },
+          }, option.label))))
+    }
+
+    function OutputPane(props) {
+      const t = props.t
+      const at = (ms) => {
+        const date = new Date(ms)
+        const pad = (value) => (value < 10 ? '0' + String(value) : String(value))
+        return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
+      }
+      const [level, setLevel] = useState('all')
+      const [kind, setKind] = useState('all')
+      const [query, setQuery] = useState('')
+      /* 筛选留在这里而不是父层：它只关心这一屏的记录，没必要污染上面那堆状态。 */
+      const visible = useMemo(() => {
+        const needle = query.trim()
+        let pattern = null
+        if (needle !== '') {
+          try {
+            pattern = new RegExp(needle, 'i')
+          } catch (failure) {
+            void failure
+            pattern = null
+          }
+        }
+        return props.records.filter((item) => {
+          if (level !== 'all' && item.level !== level) return false
+          if (kind !== 'all' && item.category !== kind) return false
+          if (needle === '') return true
+          const hay = String(item.command) + ' ' + String(item.message === undefined ? '' : item.message) + ' ' + String(item.stderr === undefined ? '' : item.stderr)
+          if (pattern !== null) return pattern.test(hay)
+          return hay.toLowerCase().indexOf(needle.toLowerCase()) >= 0
+        })
+      }, [props.records, level, kind, query])
+      const pick = (values, current, onPick, labelOf) => E(DropDown, {
+        value: current,
+        options: values.map((value) => ({ value: value, label: labelOf(value) })),
+        onPick: onPick,
+      })
+      return E('div', { className: 'gw-diff' },
+        E('div', { className: 'gw-diff-head' },
+          E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '\u2190 ' + t('back')),
+          E('span', { className: 'gw-diff-title' }, t('showOutput')),
+          E('span', { className: 'gw-spacer' }),
+          E('button', { className: 'gw-icon', 'data-tip': t('refresh'), onClick: props.onRefresh },
+            E('svg', {
+              width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
+              stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+            }, E('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5.4H10' })))),
+        E('div', { className: 'gw-output-bar' },
+          E('span', {
+            className: 'gw-output-exe',
+            title: props.executable === undefined ? 'git' : props.executable,
+          }, 'git: ' + String(props.executable === undefined ? 'git' : props.executable)),
+          E('span', { className: 'gw-spacer' }),
+          pick(POLL_LEVELS, level, setLevel, (value) => (value === 'all' ? t('allLevels') : value)),
+          pick(OUTPUT_KINDS, kind, setKind, (value) => (value === 'all' ? t('allKinds') : value)),
+          E('input', {
+            className: 'gw-output-search',
+            value: query,
+            placeholder: t('searchOutput'),
+            onChange: (event) => setQuery(event.target.value),
+          })),
+        visible.length === 0
+          ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
+          : E('div', { className: 'gw-output-scroll' }, E('div', { className: 'gw-output' }, visible.map((item, index) => E('div', {
+            key: 'o' + String(index),
+            className: 'gw-output-item'
+              + (item.failed === true ? ' gw-output-fail' : '')
+              + (item.level === 'debug' ? ' gw-output-quiet' : ''),
+          },
+            E('div', { className: 'gw-output-meta' },
+              E('div', { className: 'gw-output-time' }, at(item.at)),
+              E('div', { className: 'gw-output-ms' }, String(item.ms) + ' ms')),
+            E('div', { className: 'gw-output-body' },
+              E('div', { className: 'gw-output-cmd' }, item.command),
+              E('div', { className: 'gw-output-note' },
+                item.failed === true
+                  ? item.message
+                  : 'exit ' + String(item.code) + ' · ' + String(item.stdoutBytes) + ' B')))))))
+    }
+
+    /** 面板偏好：刷新频率与每页条数，改完立即生效并记住。 */
+    function SettingsDialog(props) {
+      const t = props.t
+      const [poll, setPoll] = useState(props.prefs.poll)
+      const [page, setPage] = useState(props.prefs.page)
+      const row = (label, values, current, onPick, format) => E('div', { className: 'gw-set-row' },
+        E('span', { className: 'gw-set-label' }, label),
+        E('div', { className: 'gw-set-opts' }, values.map((value) => E('button', {
+          key: String(value),
+          className: 'gw-set-opt' + (value === current ? ' gw-set-opt-on' : ''),
+          onClick: () => onPick(value),
+        }, format(value)))))
+      return E('div', {
+        className: 'gw-scrim',
+        onMouseDown: (event) => { if (event.target === event.currentTarget) props.onClose() },
+      },
+        E('div', { className: 'gw-card' },
+          E('div', { className: 'gw-card-head' },
+            E('span', { className: 'gw-card-title' }, t('settings')),
+            E('button', { className: 'gw-card-close', onClick: props.onClose }, '×')),
+          E('div', { className: 'gw-card-body' },
+            row(t('pollLabel'), PREFS_POLL, poll, setPoll, (value) => value === 0 ? t('off') : String(value / 1000) + 's'),
+            row(t('pageLabel'), PREFS_PAGE, page, setPage, (value) => String(value))),
+          E('div', { className: 'gw-card-foot' },
+            E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, t('cancel')),
+            E('button', {
+              className: 'gw-btn gw-btn-primary gw-btn-sm',
+              onClick: () => props.onSave({ poll: poll, page: page }),
+            }, t('save')))))
+    }
+
+    /* 列表和表单不并排：表单打开时它就是正文，底部只留取消与保存；
+       表单关着时正文是远程列表，底部只留「添加远程」。两个动作区不同时出现。 */
     function RemoteDialog(props) {
       const t = props.t
       const list = Array.isArray(props.list) ? props.list : []
@@ -940,25 +1460,49 @@ window.__ModuleLoader__.load({
         )
       }
 
-      const form = draft === null ? null : E('div', { className: 'gw-form' },
-        E('label', { className: 'gw-field' }, E('span', null, t('remoteName')),
-          E('input', {
-            className: 'gw-input', value: draft.name, disabled: busy,
-            onChange: (event) => setDraft({ ...draft, name: event.target.value }),
-          })),
-        E('label', { className: 'gw-field' }, E('span', null, t('remoteUrl')),
-          E('input', {
-            className: 'gw-input', value: draft.url, disabled: busy,
-            onChange: (event) => setDraft({ ...draft, url: event.target.value }),
-          })),
-        E('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: '6px' } },
-          E('button', {
-            className: 'gw-btn gw-btn-ghost gw-btn-sm', disabled: busy,
-            onClick: () => setDraft(null),
-          }, t('cancel')),
-          E('button', {
-            className: 'gw-btn gw-btn-primary gw-btn-sm', disabled: busy, onClick: submit,
-          }, t('save'))))
+      let body = null
+      if (draft !== null) {
+        body = E('div', { className: 'gw-form' },
+          E('label', { className: 'gw-field' }, E('span', null, t('remoteName')),
+            E('input', {
+              className: 'gw-input', value: draft.name, disabled: busy,
+              placeholder: 'origin',
+              onChange: (event) => setDraft({ ...draft, name: event.target.value }),
+            })),
+          E('label', { className: 'gw-field' }, E('span', null, t('remoteUrl')),
+            E('input', {
+              className: 'gw-input', value: draft.url, disabled: busy,
+              placeholder: 'git@github.com:owner/repo.git',
+              onChange: (event) => setDraft({ ...draft, url: event.target.value }),
+            })))
+      } else if (list.length === 0) {
+        body = E('div', { className: 'gw-empty' }, t('remoteEmpty'))
+      } else {
+        body = E('div', { className: 'gw-remote-list' }, list.map((item) => E('div', {
+          className: 'gw-remote', key: item.name,
+        },
+          E('div', { className: 'gw-remote-main' },
+            E('span', { className: 'gw-remote-name' }, item.name),
+            E('span', { className: 'gw-remote-url', title: item.fetchUrl }, item.fetchUrl)),
+          E('div', { className: 'gw-remote-actions' },
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: () => setDraft({ mode: 'edit', name: item.name, url: item.fetchUrl, original: item.name }),
+            }, t('remoteEdit')),
+            E('button', {
+              className: 'gw-btn gw-btn-ghost gw-btn-sm',
+              onClick: () => { void props.onRemove(item.name) },
+            }, t('remoteRemove'))))))
+      }
+
+      const foot = draft === null
+        ? E('button', {
+          className: 'gw-btn gw-btn-primary', disabled: busy,
+          onClick: () => setDraft({ mode: 'add', name: 'origin', url: '', original: '' }),
+        }, t('remoteAdd'))
+        : E('div', { className: 'gw-card-actions' },
+          E('button', { className: 'gw-btn gw-btn-ghost', disabled: busy, onClick: () => setDraft(null) }, t('cancel')),
+          E('button', { className: 'gw-btn gw-btn-primary', disabled: busy, onClick: submit }, t('save')))
 
       return E('div', {
         className: 'gw-scrim',
@@ -966,34 +1510,15 @@ window.__ModuleLoader__.load({
       },
         E('div', { className: 'gw-card' },
           E('div', { className: 'gw-card-head' },
-            t('remotes'),
-            E('span', { className: 'gw-spacer' }),
-            E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onClose }, '✕')),
-          E('div', { className: 'gw-card-body' },
-            list.length === 0 && draft === null
-              ? E('div', { className: 'gw-empty' }, t('remoteEmpty'))
-              : list.map((item) => E('div', { className: 'gw-remote', key: item.name },
-                  E('span', { className: 'gw-remote-name' }, item.name),
-                  E('span', { className: 'gw-remote-url', title: item.fetchUrl }, item.fetchUrl),
-                  E('div', { className: 'gw-remote-actions' },
-                    E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: () => setDraft({ mode: 'edit', name: item.name, url: item.fetchUrl, original: item.name }),
-                    }, t('remoteEdit')),
-                    E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: () => { void props.onRemove(item.name) },
-                    }, t('remoteRemove'))))),
-            form),
-          E('div', { className: 'gw-card-foot' },
-            E('button', {
-              className: 'gw-btn gw-btn-sm', disabled: busy,
-              onClick: () => setDraft({ mode: 'add', name: 'origin', url: '', original: '' }),
-            }, t('remoteAdd')))))
+            E('span', { className: 'gw-card-title' }, t('remotes')),
+            E('button', { className: 'gw-card-close', onClick: props.onClose }, '\u2715')),
+          E('div', { className: 'gw-card-body' }, body),
+          E('div', { className: 'gw-card-foot' }, foot)))
     }
 
     function FileRow(props) {
       const item = props.item
+      const extra = props.style === undefined ? {} : props.style
       const t = props.t
       const parts = dirAndName(item.path)
       const conflicted = item.conflicted === true
@@ -1002,32 +1527,128 @@ window.__ModuleLoader__.load({
       let idxCode = item.index
       let workCode = item.worktree
       if (untracked) { idxCode = '?' }
-      return E('div', { className: 'gw-file', onClick: () => props.onOpen(item), title: item.path },
-        E('span', { className: codeClass(conflicted ? 'U' : idxCode === ' ' ? '.' : idxCode) }, conflicted ? 'U' : (idxCode === ' ' || idxCode === '' ? '·' : idxCode)),
-        E('span', { className: codeClass(workCode === ' ' ? '.' : workCode) }, workCode === ' ' || workCode === '' || workCode === undefined ? '·' : workCode),
+      /* 不用状态字母，靠分区（分组）+ 颜色表达：待提交与新文件偏绿、改动偏黄、删除与冲突偏红。 */
+      let tone = 'gw-tone-mod'
+      if (conflicted) tone = 'gw-tone-danger'
+      else if (workCode === 'D' || idxCode === 'D') tone = 'gw-tone-danger'
+      else if (props.group === 'staged') tone = 'gw-tone-new'
+      else if (props.group === 'untracked') tone = 'gw-tone-new'
+      else if (props.group === 'unstaged') tone = 'gw-tone-mod'
+
+      return E('div', {
+        className: 'gw-file ' + tone,
+        style: extra,
+        onClick: () => props.onOpenEditor(item),
+        title: item.path,
+      },
+        props.indent === true ? E('span', { className: 'gw-file-lead' }) : null,
+        E('svg', {
+          className: 'gw-file-icon', width: 13, height: 13, viewBox: '0 0 16 16',
+          fill: 'none', stroke: 'currentColor', strokeWidth: 1.2,
+          strokeLinejoin: 'round', strokeLinecap: 'round',
+        },
+          E('path', { d: 'M4 1.8h4.6L12 5.2v9H4z' }),
+          E('path', { d: 'M8.6 1.8v3.4H12' })),
         E('span', { className: 'gw-file-name' },
           parts.dir === '' ? null : E('span', { className: 'gw-file-dir' }, parts.dir),
           parts.name),
+
         E('span', { className: 'gw-file-actions' },
-          untracked || !staged
-            ? E('button', {
-                className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                title: t('stage'),
-                onClick: (event) => { event.stopPropagation(); props.onStage(item) },
-              }, '＋')
+          E(ActionIcon, { name: 'open', title: t('openFile'), onClick: () => props.onOpenEditor(item) }),
+          props.group === 'staged'
+            ? E(ActionIcon, { name: 'unstage', title: t('unstage'), onClick: () => props.onUnstage(item) })
             : null,
-          staged
-            ? E('button', {
-                className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                title: t('unstage'),
-                onClick: (event) => { event.stopPropagation(); props.onUnstage(item) },
-              }, '－')
+          props.group === 'untracked'
+            ? E(ActionIcon, { name: 'ignore', title: t('ignoreFile'), onClick: () => props.onIgnore([item.path]) })
             : null,
-          E('button', {
-            className: 'gw-btn gw-btn-ghost gw-btn-sm',
-            title: t('discard'),
-            onClick: (event) => { event.stopPropagation(); props.onDiscard(item) },
-          }, '⤺')))
+          props.group === 'untracked' || props.group === 'unstaged'
+            ? E(ActionIcon, { name: 'discard', title: t('discard'), onClick: () => props.onDiscard(item) })
+            : null,
+          props.group === 'untracked' || props.group === 'unstaged'
+            ? E(ActionIcon, { name: 'stage', title: t('stage'), onClick: () => props.onStage(item) })
+            : null))
+    }
+
+    /** 把扁平的路径表折成树：中间节点是目录，叶子才是真的文件。 */
+    function buildTree(items) {
+      const root = { name: '', path: '', dir: true, children: [], item: null }
+      const dirs = new Map()
+      dirs.set('', root)
+      for (const item of items) {
+        const parts = String(item.path).split('/')
+        let parent = root
+        let acc = ''
+        for (let i = 0; i < parts.length - 1; i++) {
+          acc = acc === '' ? parts[i] : acc + '/' + parts[i]
+          if (!dirs.has(acc)) {
+            const node = { name: parts[i], path: acc, dir: true, children: [], item: null }
+            dirs.set(acc, node)
+            parent.children.push(node)
+          }
+          parent = dirs.get(acc)
+        }
+        parent.children.push({
+          name: parts[parts.length - 1], path: item.path, dir: false, children: [], item: item,
+        })
+      }
+      const sort = (node) => {
+        node.children.sort((a, b) => {
+          if (a.dir !== b.dir) return a.dir ? -1 : 1
+          return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+        })
+        for (const child of node.children) if (child.dir) sort(child)
+      }
+      sort(root)
+      return root.children
+    }
+
+    /** 树形视图里的一行：目录只显示名字和计数，文件沿用 FileRow。 */
+    function TreeRow(props) {
+      const node = props.node
+      const depth = props.depth
+      if (node.dir === false) {
+        return E(FileRow, {
+          item: node.item,
+          t: props.t,
+          indent: true,
+          style: { paddingLeft: '0px' },
+          onOpen: props.onOpen,
+          onOpenEditor: props.onOpenEditor,
+          onStage: props.onStage,
+          onUnstage: props.onUnstage,
+          onDiscard: props.onDiscard,
+        })
+      }
+      const open = props.collapsed.has(node.path) === false
+      return E('div', null,
+        E('div', {
+          className: 'gw-file gw-tree-dir',
+          style: { paddingLeft: '0px' },
+          onClick: () => props.onToggleDir(node.path),
+        },
+          E(Caret, { open: open }),
+          E('svg', {
+            className: 'gw-dir-icon', width: 13, height: 13, viewBox: '0 0 16 16',
+            fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinejoin: 'round',
+          },
+            E('path', { d: open ? 'M1.8 4.2h4l1.4 1.6h7v6.4H1.8z' : 'M1.8 4.2h4l1.4 1.6h7v6.4H1.8z' })),
+          E('span', { className: 'gw-tree-name' }, node.name)),
+        open
+          ? E('div', { className: 'gw-tree-kids' },
+              node.children.map((child, index) => E(TreeRow, {
+                key: child.path + ':' + String(index),
+                node: child,
+                depth: depth + 1,
+                t: props.t,
+                collapsed: props.collapsed,
+                onToggleDir: props.onToggleDir,
+                onOpen: props.onOpen,
+                onOpenEditor: props.onOpenEditor,
+                onStage: props.onStage,
+                onUnstage: props.onUnstage,
+                onDiscard: props.onDiscard,
+              })))
+          : null)
     }
 
     function ChangeGroup(props) {
@@ -1035,23 +1656,38 @@ window.__ModuleLoader__.load({
       const items = props.items
       return E('div', null,
         E('div', { className: 'gw-group-head', onClick: props.onToggle },
-          E('span', { className: 'gw-caret' }, props.open ? '▾' : '▸'),
-          E('span', null, props.title),
-          E('span', { className: 'gw-count' }, ' ' + items.length),
-          props.action === undefined || props.action === null
-            ? null
-            : E('span', { className: 'gw-group-actions' }, props.action)),
-        props.open
-          ? items.map((item, index) => E(FileRow, {
-              key: item.path + ':' + String(index),
-              item: item,
+          E(Caret, { open: props.open === true }),
+          E('span', { className: 'gw-group-title' }, props.title),
+          E('span', { className: 'gw-spacer' }),
+          E('span', { className: 'gw-group-actions' },
+            props.action === undefined || props.action === null ? null : props.action),
+          E('span', { className: 'gw-badge' }, String(items.length))),
+        props.open === false ? null : props.tree === true
+          ? E('div', { className: 'gw-tree-root' }, buildTree(items).map((node, index) => E(TreeRow, {
+              key: 't' + String(index),
+              node: node,
+              depth: 0,
               t: t,
+              collapsed: props.collapsed,
+              onToggleDir: props.onToggleDir,
               onOpen: props.onOpen,
+              onOpenEditor: props.onOpenEditor,
               onStage: props.onStage,
               onUnstage: props.onUnstage,
               onDiscard: props.onDiscard,
-            }))
-          : null)
+            })))
+          : items.map((item, index) => E(FileRow, {
+              key: item.path + ':' + String(index),
+              item: item,
+              group: props.group,
+              t: t,
+              onOpen: props.onOpen,
+              onOpenEditor: props.onOpenEditor,
+              onStage: props.onStage,
+              onUnstage: props.onUnstage,
+              onDiscard: props.onDiscard,
+              onIgnore: props.onIgnore,
+            })))
     }
 
     function GraphRow(props) {
@@ -1092,6 +1728,42 @@ window.__ModuleLoader__.load({
           E('span', null, entry.short)))
     }
 
+    /** 只要逐行着色那一段，供批量标签页复用；未改动的长段折起来，点一下就地展开。 */
+    function DiffBody(props) {
+      const t = props.t
+      const [unfolded, setUnfolded] = useState({})
+      const rows = useMemo(
+        () => foldRows(splitDiff(props.text === undefined ? '' : props.text), unfolded),
+        [props.text, unfolded],
+      )
+      if (rows.length === 0) return E('div', { className: 'gw-empty' }, '—')
+      return E('div', { className: 'gw-diff-body' },
+        rows.map((row, index) => {
+          if (row.type === 'fold') {
+            return E('div', {
+              key: 'd' + String(index),
+              className: 'gw-diff-fold',
+              onClick: () => setUnfolded(Object.assign({}, unfolded, { [row.key]: true })),
+            },
+              E('span', { className: 'gw-diff-fold-text' }, String(row.count) + ' ' + t('unmodifiedLines')))
+          }
+          return E('div', {
+            key: 'd' + String(index),
+            className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
+              : row.type === 'del' ? ' gw-diff-del'
+                : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
+          },
+            E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
+            E('span', { className: 'gw-diff-sign' }, row.sign === undefined ? '' : row.sign),
+            E('span', { className: 'gw-diff-text' },
+              row.tokens === undefined
+                ? row.text
+                : row.tokens.map((part, index2) => part.cls === ''
+                  ? part.text
+                  : E('span', { key: 't' + String(index2), className: part.cls }, part.text))))
+        }))
+    }
+
     function DiffPane(props) {
       const t = props.t
       const rows = useMemo(() => splitDiff(props.text), [props.text])
@@ -1099,19 +1771,11 @@ window.__ModuleLoader__.load({
         E('div', { className: 'gw-diff-head' },
           E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '← ' + t('back')),
           E('span', { className: 'gw-diff-title' }, props.title)),
-        E('div', { className: 'gw-diff-body' },
-          props.loading
-            ? E('div', { className: 'gw-empty' }, t('loading'))
-            : rows.length === 0
-              ? E('div', { className: 'gw-empty' }, t('diffEmpty'))
-              : rows.map((row, index) => E('div', {
-                  key: 'd' + String(index),
-                  className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
-                    : row.type === 'del' ? ' gw-diff-del'
-                      : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
-                },
-                  E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
-                  E('span', { className: 'gw-diff-text' }, row.text)))))
+        props.loading
+          ? E('div', { className: 'gw-empty' }, t('loading'))
+          : rows.length === 0
+            ? E('div', { className: 'gw-empty' }, t('diffEmpty'))
+            : E(DiffBody, { t: t, text: props.text }))
     }
 
     function CommitDrawer(props) {
@@ -1262,7 +1926,7 @@ window.__ModuleLoader__.load({
       }, label)
       const act = (kind) => () => { props.onClose(); props.onAction(kind, entry) }
 
-      return E('div', { ref: ref, className: 'gw-menu', style: { left: pos.left + 'px', top: pos.top + 'px' } },
+      return E('div', { ref: ref, className: 'gw-menu gw-menu-ctx', style: { left: pos.left + 'px', top: pos.top + 'px' } },
         item(t('addTag'), act('tag')),
         item(t('branchHere'), act('branch')),
         E('div', { className: 'gw-menu-sep' }),
@@ -1309,10 +1973,17 @@ window.__ModuleLoader__.load({
       const [focus, setFocus] = useState(false)
       const [syncBusy, setSyncBusy] = useState('')
       const [moreOpen, setMoreOpen] = useState(false)
+      const [prefs, setPrefs] = useState(() => loadPrefs(cwd))
       const [morePos, setMorePos] = useState({ top: 0, right: 12 })
       const [remoteOpen, setRemoteOpen] = useState(false)
       const [remoteList, setRemoteList] = useState([])
       const [ask, setAsk] = useState(null)
+      const [treeView, setTreeView] = useState(false)
+      const [settingsOpen, setSettingsOpen] = useState(false)
+      const [outputOpen, setOutputOpen] = useState(false)
+      const [outputList, setOutputList] = useState([])
+      const [outputExe, setOutputExe] = useState('')
+      const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
       const [menu, setMenu] = useState(null)
@@ -1324,6 +1995,7 @@ window.__ModuleLoader__.load({
       // 刷新会替换整个历史列表，先把用户正在看的那一行记下来，落库后再对回去
       const pendingAnchorRef = useRef(null)
       const entriesRef = useRef([])
+      const consumedRef = useRef(0)
       const offsetsRef = useRef({ list: [], total: 0 })
       useEffect(() => {
         aliveRef.current = true
@@ -1361,11 +2033,12 @@ window.__ModuleLoader__.load({
         if (cwd === '') return
         try {
           // 已经往下翻过的部分要一起取回来，否则刷新会把列表截回第一页
-          const limit = Math.max(PAGE_SIZE, entriesRef.current.length)
+          const limit = Math.max(prefs.page, entriesRef.current.length)
           const anchor = captureAnchor()
           const data = await api('log', { cwd: cwd, limit: limit, skip: 0 })
           if (!aliveRef.current) return
           pendingAnchorRef.current = anchor
+          consumedRef.current = typeof data.consumed === 'number' ? data.consumed : 0
           setEntries(Array.isArray(data.entries) ? data.entries : [])
           setHasMore(data.hasMore === true)
           setError(null)
@@ -1405,7 +2078,7 @@ window.__ModuleLoader__.load({
           if (signature === lastSigRef.current) return
           lastSigRef.current = signature
           await refreshLog()
-        }, POLL_MS)
+        }, prefs.poll)
         return () => { stopped = true; clearInterval(timer) }
       }, [cwd, props.visible, refreshSummary, refreshLog])
 
@@ -1413,9 +2086,12 @@ window.__ModuleLoader__.load({
         if (loadingMore || !hasMore || cwd === '') return
         setLoadingMore(true)
         try {
-          const data = await api('log', { cwd: cwd, limit: PAGE_SIZE, skip: entries.length })
+          /* 用后端回传的 consumed 当游标：它只数历史里取走的条数，
+             不含首屏额外插进来的 stash 行，翻页才不会错位或重复。 */
+          const data = await api('log', { cwd: cwd, limit: prefs.page, skip: consumedRef.current })
           if (!aliveRef.current) return
           const next = Array.isArray(data.entries) ? data.entries : []
+          consumedRef.current = typeof data.consumed === 'number' ? data.consumed : consumedRef.current + next.length
           setEntries((prev) => prev.concat(next))
           setHasMore(data.hasMore === true)
         } catch (failure) {
@@ -1466,6 +2142,7 @@ window.__ModuleLoader__.load({
             path: item.path,
             staged: item.staged === true,
             untracked: item.untracked === true,
+            full: true,
           })
           if (aliveRef.current) setDiffView({ title: item.path, text: data.text, loading: false })
         } catch (failure) {
@@ -1473,15 +2150,59 @@ window.__ModuleLoader__.load({
         }
       }, [cwd])
 
+      /* 侧边栏自带一个隐藏的 diff 标签，给它一个 SidebarDiffRef 就能在新标签页里
+         画出红绿行号的那种视图。优先用它，拿不到服务才退回下半区的内联预览。 */
+      const openDiffTab = useCallback((ref, title) => {
+        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
+        if (service === undefined || service === null || typeof service.openTab !== 'function') return false
+        /* 统一走我们自己的批量差异标签：单文件也是它，
+           这样符号只有 + 和 −，不会出现那个修饰行的 ~。 */
+        const meta = ref.kind === 'worktree'
+          ? { cwd: cwd, paths: [ref.path], staged: ref.staged === true }
+          : { cwd: cwd, paths: [ref.path], hash: ref.hashFull }
+        const key = ref.kind === 'worktree'
+          ? 'files:worktree:' + ref.path + ':' + String(ref.staged)
+          : 'files:commit:' + ref.hashFull + ':' + ref.path
+        try {
+          service.openTab({ type: 'git-workbench-files', id: key, title: title, meta: meta }, scope)
+          return true
+        } catch (failure) {
+          void failure
+          return false
+        }
+      }, [ctx, scope, cwd])
+
+      /* 工作区的文件：单文件 diff，未暂存与已暂存各看各的那一侧。 */
+      const openInEditor = useCallback((item) => {
+        const staged = item !== null && item !== undefined && item.staged === true && item.unstaged !== true
+        const ref = {
+          kind: 'worktree',
+          path: item.path,
+          staged: staged,
+          untracked: item.untracked === true,
+        }
+        if (openDiffTab(ref, item.path) === true) return
+        void openWorkDiff(item)
+      }, [openDiffTab, openWorkDiff])
+
+      /* 提交详情里的文件：侧边栏的 diff 标签只认「整个提交」，here 就打开该提交。 */
       const openCommitDiff = useCallback(async (file) => {
+        const ref = {
+          kind: 'commit',
+          path: file.path,
+          hash: String(selected).slice(0, 7),
+          hashFull: String(selected),
+          subject: '',
+        }
+        if (openDiffTab(ref, file.path) === true) return
         setDiffView({ title: file.path, text: '', loading: true })
         try {
-          const data = await api('fileDiff', { cwd: cwd, hash: selected, path: file.path })
+          const data = await api('fileDiff', { cwd: cwd, hash: selected, path: file.path, full: true })
           if (aliveRef.current) setDiffView({ title: file.path + ' @ ' + String(selected).slice(0, 7), text: data.text, loading: false })
         } catch (failure) {
           if (aliveRef.current) setDiffView({ title: file.path, text: String(failure.message), loading: false })
         }
-      }, [cwd, selected])
+      }, [cwd, selected, detail, openDiffTab])
 
       const doStage = useCallback((item) => {
         void run(async () => {
@@ -1505,6 +2226,78 @@ window.__ModuleLoader__.load({
           await refreshSummary()
         })
       }, [cwd, run, refreshSummary, t])
+
+      const doDiscardAll = useCallback((items) => {
+        if (items.length === 0) return
+        const ok = window.confirm(t('discardAllConfirm', { count: String(items.length) }))
+        if (!ok) return
+        void run(async () => {
+          await api('discard', { cwd: cwd, paths: items.map((item) => item.path), confirm: true })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary, t])
+
+      const doIgnore = useCallback((paths) => {
+        if (paths.length === 0) return
+        void run(async () => {
+          await api('ignore', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      const doStageAll = useCallback((paths) => {
+        void run(async () => {
+          await api('stage', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      const doUnstageAll = useCallback((paths) => {
+        void run(async () => {
+          await api('unstage', { cwd: cwd, paths: paths })
+          await refreshSummary()
+        })
+      }, [cwd, run, refreshSummary])
+
+      /** 每组标题上的批量动作，悬停才出现；冲突组没有批量操作。 */
+      /* 一个分组的所有文件放进同一个差异标签页，省得一个一个点。 */
+      const openGroupDiff = useCallback((group, items) => {
+        const paths = items.map((item) => item.path)
+        if (paths.length === 0) return
+        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
+        if (service === undefined || service === null || typeof service.openTab !== 'function') return
+        try {
+          service.openTab({
+            type: 'git-workbench-files',
+            id: 'files:' + group,
+            title: t('filesTabTitle') + ' · ' + String(paths.length),
+            meta: { cwd: cwd, paths: paths, staged: group === 'staged' },
+          }, scope)
+        } catch (failure) {
+          void failure
+        }
+      }, [ctx, scope, cwd, t])
+
+      const groupActions = useCallback((group, items) => {
+        const paths = items.map((item) => item.path)
+        const openAll = E(ActionIcon, { name: 'openAll', title: t('openAllDiffs'), onClick: () => openGroupDiff(group, items) })
+        if (group === 'staged') {
+          return E('span', { style: { display: 'flex', gap: '1px' } },
+            openAll,
+            E(ActionIcon, { name: 'unstage', title: t('unstageAll'), onClick: () => doUnstageAll(paths) }))
+        }
+        if (group === 'unstaged') {
+          return E('span', { style: { display: 'flex', gap: '1px' } },
+            openAll,
+            E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
+            E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
+        }
+        return E('span', { style: { display: 'flex', gap: '1px' } },
+          openAll,
+          E(ActionIcon, { name: 'ignore', title: t('ignoreAll'), onClick: () => doIgnore(paths) }),
+          E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
+          E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
+      }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore, openGroupDiff])
 
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
@@ -1548,6 +2341,14 @@ window.__ModuleLoader__.load({
       }), [cwd, run, loadRemotes, refreshSummary])
 
       /** 网络操作单独记忙标记，避免把整块面板的其它按钮一起锁住。 */
+      const toggleDir = useCallback((path) => {
+        setCollapsedDirs((previous) => (
+          previous.indexOf(path) >= 0 ? previous.filter((item) => item !== path) : previous.concat([path])
+        ))
+      }, [])
+
+      const collapsedSet = useMemo(() => new Set(collapsedDirs), [collapsedDirs])
+
       const doSync = useCallback((method) => {
         if (syncBusy !== '') return
         void run(async () => {
@@ -1561,20 +2362,6 @@ window.__ModuleLoader__.load({
         })
       }, [cwd, run, refreshAll, syncBusy])
 
-
-      const doStageAll = useCallback((paths) => {
-        void run(async () => {
-          await api('stage', { cwd: cwd, paths: paths })
-          await refreshSummary()
-        })
-      }, [cwd, run, refreshSummary])
-
-      const doUnstageAll = useCallback((paths) => {
-        void run(async () => {
-          await api('unstage', { cwd: cwd, paths: paths })
-          await refreshSummary()
-        })
-      }, [cwd, run, refreshSummary])
 
       const doCommit = useCallback(() => {
         if (message.trim() === '' && amend === false) { setError(t('emptyMsg')); return }
@@ -1596,7 +2383,7 @@ window.__ModuleLoader__.load({
       const changes = summary !== null && Array.isArray(summary.changes) ? summary.changes : []
       const conflicted = changes.filter((item) => item.conflicted === true)
       const staged = changes.filter((item) => item.conflicted !== true && item.staged === true)
-      const unstaged = changes.filter((item) => item.conflicted !== true && item.staged !== true && item.untracked !== true)
+      const unstaged = changes.filter((item) => item.conflicted !== true && item.unstaged === true)
       const untracked = changes.filter((item) => item.untracked === true)
 
       // 未提交的改动单独占一行，形状与提交一致，但不指向任何对象
@@ -1808,77 +2595,65 @@ window.__ModuleLoader__.load({
         }
       }, [cwd, run, refreshAll, t, onBranch, onCheckout])
 
+      /** 菜单行：给了 action 就能点，给了 children 就在右侧展开下一级。 */
+      const menuRow = (label, action, children) => {
+        const kids = Array.isArray(children) ? children : []
+        const leaf = kids.length === 0
+        return E('div', {
+          className: 'gw-menu-item' + (leaf ? '' : ' gw-menu-parent') + (leaf && action === null ? ' gw-menu-off' : ''),
+          onClick: action === null ? undefined : action,
+        },
+          E('span', { className: 'gw-menu-label' }, label),
+          leaf ? null : E('div', { className: 'gw-menu-sub' },
+            kids.map((kid, index) => E('div', { key: 's' + String(index), className: 'gw-menu-item' }, kid))))
+      }
+
       if (cwd === '') {
         return E('div', { className: 'gw-root' }, E('div', { className: 'gw-empty' }, t('noRepo')))
       }
 
       const isRepo = summary !== null && summary.isRepo === true
 
-      const top = E('div', { className: 'gw-top' },
-        E('div', { className: 'gw-pad' },
-          error === null ? null : E('div', { className: 'gw-err', key: error },
-            E('span', { className: 'gw-err-text' }, error),
-            E('button', {
-              className: 'gw-err-close',
-              'aria-label': t('close'),
-              onClick: () => setError(null),
-            }, '×')),
-          E('textarea', {
-            className: 'gw-textarea',
-            placeholder: t('commitPlaceholder'),
-            value: message,
-            spellCheck: false,
-            onChange: (event) => setMessage(event.target.value),
-            onKeyDown: onKeyDown,
-          }),
-          E('div', { className: 'gw-compose-actions' },
-            E('button', {
-              className: 'gw-btn gw-btn-primary',
-              disabled: busy || (!isRepo),
-              onClick: doCommit,
-              title: '⌘/Ctrl + Enter',
-            }, t('commit')),
-            E('label', { className: 'gw-check' },
-              E('input', { type: 'checkbox', checked: amend, onChange: (event) => setAmend(event.target.checked) }),
-              t('commitAmend')))),
-        E('div', { className: 'gw-changes' },
-          summary === null
-            ? E('div', { className: 'gw-empty' }, t('loading'))
-            : changes.length === 0
-              ? E('div', { className: 'gw-empty' }, t('noChanges'))
-              : E('div', null,
-                  E(ChangeGroup, {
-                    title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
-                    onToggle: () => toggleGroup('conflicts'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                  }),
-                  E(ChangeGroup, {
-                    title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
-                    onToggle: () => toggleGroup('staged'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: staged.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doUnstageAll(staged.map((item) => item.path)) },
-                    }, t('unstageAll')),
-                  }),
-                  E(ChangeGroup, {
-                    title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
-                    onToggle: () => toggleGroup('changes'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: unstaged.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doStageAll(unstaged.map((item) => item.path)) },
-                    }, t('stageAll')),
-                  }),
-                  E(ChangeGroup, {
-                    title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
-                    onToggle: () => toggleGroup('untracked'),
-                    onOpen: openWorkDiff, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard,
-                    action: untracked.length === 0 ? null : E('button', {
-                      className: 'gw-btn gw-btn-ghost gw-btn-sm',
-                      onClick: (event) => { event.stopPropagation(); doStageAll(untracked.map((item) => item.path)) },
-                    }, t('stageAll')),
-                  }))))
+      const changeBar = E('div', { className: 'gw-bar' },
+        E('span', { className: 'gw-bar-title' }, t('changes')),
+        E('span', { className: 'gw-count' }, String(changes.length)),
+        E('span', { className: 'gw-spacer' }),
+        iconButton({
+          title: treeView === true ? t('flatView') : t('treeView'),
+          active: treeView === true,
+          onClick: () => setTreeView(treeView === false),
+          path: treeView === true
+            ? 'M3 4h10M3 8h10M3 12h10'
+            : 'M2.6 3h1.8M6.4 3h7M5.2 8h1.8M9 8h4.4M7.8 13h1.8M11.6 13h1.8',
+        }),
+        iconButton({
+          title: t('remotes'),
+          onClick: () => setRemoteOpen(true),
+          path: 'M5.5 12.5a3 3 0 0 1 .3-6 3.8 3.8 0 0 1 7.2 .8 2.6 2.6 0 0 1-.5 5.2H5.5z',
+        }),
+        iconButton({
+          title: t('settings'),
+          onClick: () => setSettingsOpen(true),
+          path: 'M6.58 3.31L6.87 1.70L9.13 1.70L9.42 3.31L11.35 4.43L12.89 3.87L14.02 5.83'
+            + 'L12.77 6.88L12.77 9.12L14.02 10.17L12.89 12.13L11.35 11.57L9.42 12.69L9.13 14.30'
+            + 'L6.87 14.30L6.58 12.69L4.65 11.57L3.11 12.13L1.98 10.17L3.23 9.12L3.23 6.88'
+            + 'L1.98 5.83L3.11 3.87L4.65 4.43Z',
+          extra: E('circle', { cx: 8, cy: 8, r: 2.4 }),
+        }),
+        iconButton({
+          title: t('moreActions'),
+          onClick: (event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setMorePos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
+            setMoreOpen(true)
+          },
+          path: '',
+          extra: [
+            E('circle', { key: '1', cx: 8, cy: 3.4, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
+            E('circle', { key: '3', cx: 8, cy: 12.6, r: 1.1, fill: 'currentColor' }),
+          ],
+        }))
 
       const head = E('div', { className: 'gw-graph-head' },
         E('span', { className: 'gw-branch' },
@@ -1937,26 +2712,90 @@ window.__ModuleLoader__.load({
           title: t('refresh'),
           onClick: () => { void refreshAll() },
           path: 'M13 8a5 5 0 1 1-1.5-3.6M13.2 2.6v3.2h-3.2',
-        }),
-        iconButton({
-          title: t('moreActions'),
-          onClick: (event) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            setMorePos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) })
-            setMoreOpen(true)
-          },
-          path: '',
-          extra: [
-            E('circle', { key: '1', cx: 3.4, cy: 8, r: 1.1, fill: 'currentColor' }),
-            E('circle', { key: '2', cx: 8, cy: 8, r: 1.1, fill: 'currentColor' }),
-            E('circle', { key: '3', cx: 12.6, cy: 8, r: 1.1, fill: 'currentColor' }),
-          ],
         }))
+
+      const top = E('div', { className: 'gw-top' },
+        E('div', { className: 'gw-pad' },
+          error === null ? null : E('div', { className: 'gw-err', key: error },
+            E('span', { className: 'gw-err-text' }, error),
+            E('button', {
+              className: 'gw-err-close',
+              'aria-label': t('close'),
+              onClick: () => setError(null),
+            }, '×')),
+          changeBar,
+          E('textarea', {
+            className: 'gw-textarea',
+            placeholder: t('commitPlaceholder'),
+            value: message,
+            spellCheck: false,
+            onChange: (event) => setMessage(event.target.value),
+            onKeyDown: onKeyDown,
+          }),
+          E('div', { className: 'gw-compose-actions' },
+            E('button', {
+              className: 'gw-btn gw-btn-primary',
+              disabled: busy || (!isRepo),
+              onClick: doCommit,
+              title: '⌘/Ctrl + Enter',
+            }, t('commit')),
+            E('label', { className: 'gw-check' },
+              E('input', { type: 'checkbox', checked: amend, onChange: (event) => setAmend(event.target.checked) }),
+              t('commitAmend')))),
+        E('div', { className: 'gw-changes' },
+          summary === null
+            ? E('div', { className: 'gw-empty' }, t('loading'))
+            : changes.length === 0
+              ? null
+              : E('div', null,
+                  E(ChangeGroup, {
+                    group: 'unstaged', title: t('changes'), items: unstaged, open: openGroups.changes !== false, t: t,
+                    action: groupActions('unstaged', unstaged),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('changes'),
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'untracked', title: t('untracked'), items: untracked, open: openGroups.untracked !== false, t: t,
+                    action: groupActions('untracked', untracked),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('untracked'),
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'staged', title: t('staged'), items: staged, open: openGroups.staged !== false, t: t,
+                    action: groupActions('staged', staged),
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('staged'),
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }),
+                  E(ChangeGroup, {
+                    group: 'conflicts', title: t('conflicts'), items: conflicted, open: openGroups.conflicts !== false, t: t,
+                    action: null,
+                    tree: treeView, collapsed: collapsedSet, onToggleDir: toggleDir,
+                    onToggle: () => toggleGroup('conflicts'),
+                    onOpen: openWorkDiff, onOpenEditor: openInEditor, onStage: doStage, onUnstage: doUnstage, onDiscard: doDiscard, onIgnore: doIgnore,
+                  }))))
 
       // 有未提交行时空心圆归它，HEAD 就不再空心，保证整张图只有一个空心圆。
       const hasUncommitted = rowEntries.length > 0 && rowEntries[0].uncommitted === true
 
-      const body = diffView !== null
+      const body = outputOpen === true
+        ? E(OutputPane, {
+            t: t,
+            records: outputList,
+            executable: outputExe,
+            onBack: () => setOutputOpen(false),
+            onRefresh: () => {
+              void run(async () => {
+                const data = await api('gitRecords', { limit: 200 })
+                if (aliveRef.current === false) return
+                setOutputList(Array.isArray(data.records) ? data.records : [])
+                setOutputExe(typeof data.executable === 'string' ? data.executable : '')
+              })
+            },
+          })
+        : diffView !== null
         ? E(DiffPane, {
             t: t,
             title: diffView.title,
@@ -1975,7 +2814,10 @@ window.__ModuleLoader__.load({
                   },
                     layout.edges.map((edge, index) => {
                       const y1 = offsets.list[edge.from] + ROW_H / 2
-                      const y2 = offsets.list[edge.to] + ROW_H / 2
+                      // 悬空的边走到最后一行下沿就停，不延伸出画布。
+                      const y2 = edge.dangling === true
+                        ? offsets.list[rowEntries.length - 1] + ROW_H
+                        : offsets.list[edge.to] + ROW_H / 2
                       const x1 = edge.fromLane * LANE_W + 12
                       const x2 = edge.toLane * LANE_W + 12
                       let d
@@ -2075,12 +2917,64 @@ window.__ModuleLoader__.load({
             className: 'gw-menu',
             style: { top: morePos.top + 'px', right: morePos.right + 'px' },
           },
-            E('div', {
-              className: 'gw-menu-item',
-              onClick: () => { setMoreOpen(false); setRemoteOpen(true) },
-            }, t('remotes')),
-            E('div', { className: 'gw-menu-sep' }),
-            E('div', { className: 'gw-menu-item' }, t('openInTerminal')))),
+            menuRow(t('checkoutTo') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('checkoutTo'),
+                note: t('checkoutHint'),
+                input: true,
+                inputLabel: t('refLabel'),
+                confirmLabel: t('checkoutTo'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('checkout', { cwd: cwd, target: values.text }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('createBranchItem') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('createBranchItem'),
+                input: true,
+                inputLabel: t('nameLabel'),
+                check: true,
+                checkLabel: t('checkoutAfter'),
+                checked: true,
+                confirmLabel: t('createBranch'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('createBranch', { cwd: cwd, name: values.text, checkout: values.checked }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('tagCreateItem') + '…', () => {
+              setMoreOpen(false)
+              setAsk({
+                title: t('tagCreateItem'),
+                note: t('tagHint'),
+                input: true,
+                inputLabel: t('nameLabel'),
+                confirmLabel: t('createTag'),
+                onOk: (values) => { if (values.text !== '') void run(async () => { await api('tagCreate', { cwd: cwd, name: values.text, hash: headHash === null ? 'HEAD' : headHash }); await refreshAll() }) },
+              })
+            }),
+            menuRow(t('remotes') + '…', () => { setMoreOpen(false); setRemoteOpen(true) }),
+            E('div', { key: 'sep-output', className: 'gw-menu-sep' }),
+            menuRow(t('showOutput'), () => {
+              setMoreOpen(false)
+              setDiffView(null)
+              setOutputOpen(true)
+              void run(async () => {
+                const data = await api('gitRecords', { limit: 200 })
+                if (aliveRef.current === false) return
+                setOutputList(Array.isArray(data.records) ? data.records : [])
+                setOutputExe(typeof data.executable === 'string' ? data.executable : '')
+              })
+            }))),
+        settingsOpen === false ? null : E(SettingsDialog, {
+          t: t,
+          prefs: prefs,
+          onClose: () => setSettingsOpen(false),
+          onSave: (next) => {
+            setPrefs(next)
+            savePrefs(cwd, next)
+            setSettingsOpen(false)
+          },
+        }),
         ask === null ? null : E(AskDialog, {
           t: t,
           title: ask.title,
@@ -2113,6 +3007,127 @@ window.__ModuleLoader__.load({
     /* registration                                                        */
     /* ------------------------------------------------------------------ */
 
+    /** 行内动作图标：细线风格，跟图头那排一致，只在悬停时出现。 */
+    const ACTION_PATHS = {
+      open: ['M4 1.8h5.2L12 4.6v9.6H4z', 'M9.2 1.8v2.8H12', 'M6.2 7.4L6.2 7.4'],
+      // 暂存是加号，取消暂存是减号，一眼能分开。
+      stage: ['M8 3.4v9.2M3.4 8h9.2'],
+      unstage: ['M3.4 8h9.2'],
+      // 撤销：一个从右下折回左上的回转箭头，与 VSCode 的那个同形。
+      discard: ['M4 4.4H9.4a4.3 4.3 0 0 1 0 8.6H5.6', 'M7.6 10.8 5.4 13 7.6 15.2'],
+      ignore: ['M8 2.4a5.6 5.6 0 1 0 0 11.2A5.6 5.6 0 0 0 8 2.4z', 'M4.2 11.8 11.8 4.2'],
+      // 打开全部差异：两张叠起来的纸。
+      openAll: ['M5.8 1.8h4.6L13 4.4v7.6a1.1 1.1 0 0 1-1.1 1.1H5.8a1.1 1.1 0 0 1-1.1-1.1V2.9a1.1 1.1 0 0 1 1.1-1.1z', 'M9.6 1.9v2.6h2.6', 'M3 4.6v8.6a1.1 1.1 0 0 0 1.1 1.1h6.5'],
+    }
+
+    function ActionIcon(props) {
+      const paths = ACTION_PATHS[props.name] === undefined ? ACTION_PATHS.open : ACTION_PATHS[props.name]
+      return E('button', {
+        className: 'gw-act',
+        'data-tip': props.title,
+        onClick: (event) => { event.stopPropagation(); props.onClick(event) },
+      },
+        E('svg', {
+          width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+          strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round',
+        },
+          paths.map((d, index) => E('path', { key: 'p' + String(index), d: d }))))
+    }
+
+    /**
+     * 批量差异标签页：一个分组下所有文件并排展开，点标题折叠。
+     * 侧边栏自带的 diff 标签只认单个文件或整次提交，这一组得自己画。
+     */
+    function FilesTab(props) {
+      const t = props.t
+      const ctx = props.ctx
+      const scope = props.scope
+      const tab = props.tab
+      const meta = tab === undefined || tab === null || tab.meta === undefined || tab.meta === null ? {} : tab.meta
+      const cwd = typeof meta.cwd === 'string' ? meta.cwd : (ctx === undefined || ctx === null ? '' : sessionCwdOf(ctx, scope === undefined ? undefined : scope.sessionId))
+      const paths = Array.isArray(meta.paths) ? meta.paths : []
+      const staged = meta.staged === true
+      const hash = typeof meta.hash === 'string' ? meta.hash : ''
+      const [state, setState] = useState({ loading: true, items: [], error: null })
+      const [open, setOpen] = useState({})
+      const [token, setToken] = useState(0)
+      const alive = useRef(true)
+
+      useEffect(() => {
+        alive.current = true
+        void (async () => {
+          try {
+            const loaded = []
+            for (const item of paths) {
+              try {
+                const ask = hash === ''
+                  ? { cwd: cwd, path: item, staged: staged, full: true }
+                  : { cwd: cwd, hash: hash, path: item, full: true }
+                const data = await api('fileDiff', ask)
+                loaded.push({ path: item, text: typeof data.text === 'string' ? data.text : '' })
+              } catch (failure) {
+                loaded.push({ path: item, text: String(failure.message), failed: true })
+              }
+            }
+            if (alive.current) setState({ loading: false, items: loaded, error: null })
+          } catch (failure) {
+            if (alive.current) setState({ loading: false, items: [], error: String(failure.message) })
+          }
+        })()
+        return () => { alive.current = false }
+      }, [cwd, staged, hash, token])
+
+      const head = E('div', { className: 'gw-files-tab-bar' },
+        E('span', { className: 'gw-files-tab-title' },
+          E('svg', {
+            width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none',
+            stroke: 'currentColor', strokeWidth: 1.3,
+            strokeLinecap: 'round', strokeLinejoin: 'round',
+          },
+            E('rect', { x: 2.2, y: 2.2, width: 11.6, height: 11.6, rx: 2.8 }),
+            E('path', { d: 'M8 5.1v3.1M6.45 6.65h3.1' }),
+            E('path', { d: 'M6.45 10.6h3.1' })),
+          String(paths.length) + ' ' + t('filesUnit')),
+        E('span', { className: 'gw-spacer' }),
+        E('button', {
+          className: 'gw-icon',
+          'data-tip': t('refresh'),
+          onClick: () => setToken(token + 1),
+        }, E('svg', {
+          width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none',
+          stroke: 'currentColor', strokeWidth: 1.2,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
+        }, E('path', { d: 'M13.4 8a5.4 5.4 0 1 1-1.7-3.9M13.4 2.2V6H9.6' }))))
+
+      if (state.loading === true) return E('div', { className: 'gw-files-tab' }, head, E('div', { className: 'gw-pad' }, t('loading')))
+      if (state.error !== null) return E('div', { className: 'gw-files-tab' }, head, E('div', { className: 'gw-pad' }, state.error))
+
+      return E('div', { className: 'gw-files-tab' },
+        head,
+        state.items.map((item, index) => {
+          const openNow = open[item.path] !== false
+          const rows = splitDiff(item.text === undefined ? '' : item.text)
+          const added = rows.filter((line) => line.type === 'add').length
+          const removed = rows.filter((line) => line.type === 'del').length
+          return E('div', { key: 'f' + String(index), className: 'gw-files-tab-item' },
+            E('div', {
+              className: 'gw-files-tab-head',
+              onClick: () => setOpen(Object.assign({}, open, { [item.path]: openNow === false })),
+            },
+              E(Caret, { open: openNow }),
+              E('span', { className: 'gw-files-tab-path' }, item.path),
+              E('span', { className: 'gw-spacer' }),
+              E('span', { className: 'gw-files-tab-count' },
+                item.failed === true
+                  ? t('diffLoadError')
+                  : E('span', null,
+                      E('span', { className: 'gw-files-tab-add' }, '+' + String(added)),
+                      ' ',
+                      E('span', { className: 'gw-files-tab-del' }, '−' + String(removed))))),
+            openNow === false ? null : E(DiffBody, { t: t, text: item.text }))
+        }))
+    }
+
     /** 图头那一排小图标按钮：统一 22px 热区、14px 图形，忙时换成省略号。 */
     function iconButton(props) {
       const extras = props.extra === undefined
@@ -2134,6 +3149,18 @@ window.__ModuleLoader__.load({
         disabled: props.disabled === true,
         onClick: props.onClick,
       }, children)
+    }
+
+    /** 折叠箭头：与 diff 视图里那个一致，展开时转 90 度。 */
+    function Caret(props) {
+      return E('span', {
+        className: 'gw-caret' + (props.open === true ? ' gw-caret-open' : ''),
+        style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+      }, E('svg', {
+        width: 12, height: 12, viewBox: '0 0 16 16',
+        fill: 'none', stroke: 'currentColor', strokeWidth: 1.6,
+        strokeLinecap: 'round', strokeLinejoin: 'round',
+      }, E('path', { d: 'M6 3.5 10.5 8 6 12.5' })))
     }
 
     function TabIcon(props) {
@@ -2165,7 +3192,35 @@ window.__ModuleLoader__.load({
             single: true,
             component: (tabProps) => E(GitPanel, tabProps),
           })
-          return () => { if (typeof off === 'function') off() }
+          /* 批量差异标签：一个分组下所有文件放一起看，从分组标题打开，
+             所以不出现在新建标签的菜单里，也可以同时开好几个。 */
+          const offFiles = betterSidebar.registerTab({
+            id: 'git-workbench-files',
+            title: () => t('filesTabTitle'),
+            icon: (size) => E('svg', {
+              width: size === undefined ? 14 : size,
+              height: size === undefined ? 14 : size,
+              viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+              strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+            },
+              E('rect', { x: 2.2, y: 2.2, width: 11.6, height: 11.6, rx: 2.8 }),
+              E('path', { d: 'M8 5.1v3.1M6.45 6.65h3.1' }),
+              E('path', { d: 'M6.45 10.6h3.1' })),
+            hidden: true,
+            single: false,
+            dedupeKey: (tab) => (tab === undefined || tab === null ? undefined : tab.id),
+            component: (tabProps) => E(FilesTab, {
+              t: t,
+              ctx: tabProps.ctx,
+              scope: tabProps.scope,
+              tab: tabProps.tab,
+            }),
+          })
+          return () => {
+            if (typeof off === 'function') off()
+            if (typeof offFiles === 'function') offFiles()
+            if (typeof offOutput === 'function') offOutput()
+          }
         }, 'dsh-git-workbench: sidebar tab')
       })
     }

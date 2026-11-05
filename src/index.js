@@ -12,10 +12,10 @@
  * 或浏览器标记为同源（Sec-Fetch-Site）的请求才会被处理——跨站页面无法伪造这两个头。
  */
 
-import { existsSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { GitError, gitText, gitTextQuiet, messageOf, runGit } from './git-run.js'
+import { GitError, gitExecutable, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
 
 export const name = 'dsh-git-workbench'
@@ -155,12 +155,7 @@ async function log(payload) {
   const skip = boundedNumber(payload.skip, 0, 0, 100000)
   const args = ['log', '--date-order', '--decorate=full', '--format=' + LOG_FORMAT, '-n', String(limit + 1), '--skip', String(skip)]
   if (typeof payload.ref === 'string' && payload.ref !== '') args.push(refArg(payload.ref, 'ref'))
-  else {
-    args.push('--branches', '--tags', '--remotes', 'HEAD')
-    // stash 单独挂进来：它不在 branches/tags/remotes 里，但图上要看得见
-    const stashRef = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
-    if (stashRef !== null && stashRef.trim() !== '') args.push('refs/stash')
-  }
+  else args.push('--branches', '--tags', '--remotes', 'HEAD')
 
   let raw = ''
   try {
@@ -172,11 +167,38 @@ async function log(payload) {
     }
     throw error
   }
-  let entries = parseLog(raw)
-  // stash 的第二父是它自己的 index 快照，画出来只会多一个没人认识的节点
-  entries = entries.filter((entry) => !/^index on /.test(entry.subject))
-  const hasMore = entries.length > limit
-  return { entries: hasMore ? entries.slice(0, limit) : entries, hasMore }
+  const history = parseLog(raw)
+  const hasMore = history.length > limit
+  const page = hasMore ? history.slice(0, limit) : history
+
+  /*
+   * stash 单独取一条插进首屏，不放进上面那次遍历。
+   * 它不在 branches/tags/remotes 里，挂在 rev 列表上会被顺着第二父带出
+   * index 快照；那些快照解析出来还得丢掉，丢的时候条数就少，分页跟着错。
+   * 只取 stash@{0} 这一个提交本身，父提交交给图去连。
+   * 只在 skip 为 0 时插：翻页时它已经在上面，每页都插会出现好几行。
+   */
+  if (skip === 0 && (typeof payload.ref !== 'string' || payload.ref === '')) {
+    const stashHash = await gitTextQuiet(cwd, ['rev-parse', '--verify', '-q', 'refs/stash'])
+    if (stashHash !== null && stashHash.trim() !== '') {
+      const stashRaw = await gitTextQuiet(cwd, [
+        'log', '--no-walk=unsorted', '--decorate=full', '--format=' + LOG_FORMAT, stashHash.trim(),
+      ])
+      const stashEntry = stashRaw === null ? null : parseLog(stashRaw)[0]
+      if (stashEntry !== undefined && stashEntry !== null && page.some((item) => item.hash === stashEntry.hash) === false) {
+        // 按时间插回去，保证「新的在上、旧的在下」与父在子之后的次序不乱。
+        let at = page.length
+        for (let i = 0; i < page.length; i++) {
+          if (page[i].time < stashEntry.time) { at = i; break }
+        }
+        page.splice(at, 0, stashEntry)
+      }
+    }
+  }
+
+  /* consumed 是这一页从历史里取走的条数，不含插进来的 stash；
+     前端拿它当下一页的 skip，才不会因为多一行而错位。 */
+  return { entries: page, hasMore: hasMore, consumed: skip + (hasMore ? limit : history.length) }
 }
 
 async function branches(payload) {
@@ -214,17 +236,29 @@ async function fileDiff(payload) {
   const hash = typeof payload.hash === 'string' && payload.hash !== '' ? hashArg(payload.hash) : null
 
   let args
+  /* 未跟踪的文件在 git diff 里是隐形的，得跟 /dev/null 比。
+     这里自己判断，不指望调用方一定记得传 untracked。 */
+  let untracked = payload.untracked === true
   if (hash !== null) {
-    args = ['show', '--format=', '--patch', '--no-color', hash, '--', filePath]
+    args = ['show', '--format=', '--patch', '--no-color']
+      .concat(payload.full === true ? ['-U999999'] : [], [hash, '--', filePath])
   } else if (payload.staged === true) {
-    args = ['diff', '--cached', '--no-color', '--', filePath]
-  } else if (payload.untracked === true) {
-    args = ['diff', '--no-index', '--no-color', '--', '/dev/null', filePath]
+    args = ['diff', '--cached', '--no-color']
+      .concat(payload.full === true ? ['-U999999'] : [], ['--', filePath])
   } else {
-    args = ['diff', '--no-color', '--', filePath]
+    if (untracked === false) {
+      const tracked = await gitTextQuiet(cwd, ['ls-files', '--error-unmatch', '--', filePath])
+      untracked = tracked === null
+    }
+    /* full 表示要完整上下文：面板自己把没改的段落折起来，
+       这样折叠条能真正展开，而不是只显示个数字。 */
+    const context = payload.full === true ? ['-U999999'] : []
+    args = untracked === true
+      ? ['diff', '--no-index', '--no-color'].concat(context, ['--', '/dev/null', filePath])
+      : ['diff', '--no-color'].concat(context, ['--', filePath])
   }
 
-  const result = await runGit(cwd, args, { allowNonZero: payload.untracked === true })
+  const result = await runGit(cwd, args, { allowNonZero: untracked })
   return { path: filePath, text: result.stdout }
 }
 
@@ -453,6 +487,36 @@ async function dropCommit(payload) {
   return { hash }
 }
 
+/* ---------------------------- 忽略规则 ---------------------------- */
+
+/** 把路径追加进 .gitignore；已存在的规则不重复写。 */
+async function ignore(payload) {
+  const cwd = requireCwd(payload)
+  const paths = pathList(payload.paths)
+  const file = path.join(cwd, '.gitignore')
+  let existing = ''
+  try {
+    existing = readFileSync(file, 'utf8')
+  } catch (error) {
+    if (error !== null && error !== undefined && error.code !== 'ENOENT') {
+      throw new GitError('读取 .gitignore 失败：' + messageOf(error), 'ignore-failed', 500)
+    }
+    existing = ''
+  }
+  const known = new Set(existing.split('\n').map((line) => line.trim()))
+  const added = []
+  for (const path of paths) {
+    const rule = '/' + path
+    if (known.has(rule) || known.has(path)) continue
+    known.add(rule)
+    added.push(rule)
+  }
+  if (added.length === 0) return { added: [] }
+  const tail = existing === '' || existing.endsWith('\n') ? '' : '\n'
+  writeFileSync(file, existing + tail + added.join('\n') + '\n', 'utf8')
+  return { added: added }
+}
+
 /* ---------------------------- 远程同步 ---------------------------- */
 
 /** 网络类操作给足时间，但仍设上限：卡在认证提示时不该把面板吊死。 */
@@ -515,8 +579,14 @@ async function push(payload) {
 
 /* ============================== 方法表与 HTTP ============================== */
 
-const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes }
-const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit }
+/** 面板里的「显示 Git 输出」：把最近执行过的命令原样倒出来。 */
+function gitRecords(payload) {
+  const limit = boundedNumber(payload.limit, 200, 1, 300)
+  return { records: recentGit(limit), executable: gitExecutable() }
+}
+
+const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes, gitRecords }
+const WRITE_METHODS = { stage, unstage, discard, commit, checkout, createBranch, remoteAdd, remoteSetUrl, remoteRename, remoteRemove, fetchAll, pull, push, tagCreate, cherryPick, revertCommit, mergeCommit, rebaseOnto, resetTo, dropCommit, ignore }
 const METHODS = Object.assign({}, READ_METHODS, WRITE_METHODS)
 
 function headerOf(req, nameOfHeader) {
