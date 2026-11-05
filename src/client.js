@@ -2311,11 +2311,11 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
         try {
           await fn()
         } catch (failure) {
-          setError(failure.message)
+          showError(failure.message)
         } finally {
           if (aliveRef.current) setBusy(false)
         }
-      }, [])
+      }, [clearError, showError])
 
       const selectCommit = useCallback(async (entry) => {
         if (selected === entry.hash) {
