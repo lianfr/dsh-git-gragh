@@ -348,7 +348,7 @@ window.__ModuleLoader__.load({
 /* 浮层尺寸照宿主的菜单与对话框来：菜单四像素内距、项四乘七、圆角用中号；
    对话框用面板级圆角、无边框、二十像素横向内距。 */
 .gw-menu { position:fixed; z-index:9999; min-width:156px; padding:4px;
-  border-radius:var(--dsw-radius-lg, 16px);
+  border-radius:var(--dsw-radius-xl, 20px);
   background:var(--dsw-alias-bg-layer-3);
   border:.5px solid var(--dsw-alias-border-l2);
   box-shadow:var(--dsw-elevation-prominent, 0 8px 24px rgba(0,0,0,.24)); }
@@ -371,7 +371,7 @@ window.__ModuleLoader__.load({
 .gw-menu-parent > .gw-menu-arrow { flex:none; color:var(--dsw-alias-label-tertiary); font-size:12px; }
 .gw-menu-off { opacity:.45; cursor:default; }
 .gw-menu-sub { display:none; position:absolute; left:calc(100% + 10px); bottom:-4px; min-width:163px;
-  padding:4px; border-radius:var(--dsw-radius-lg, 16px); border:.5px solid var(--dsw-alias-border-l2);
+  padding:4px; border-radius:var(--dsw-radius-xl, 20px); border:.5px solid var(--dsw-alias-border-l2);
   background:var(--dsw-alias-bg-layer-3);
   box-shadow:var(--dsw-elevation-prominent, 0 12px 28px rgba(0,0,0,.3)); z-index:20; }
 .gw-menu-parent:hover > .gw-menu-sub { display:block; }
