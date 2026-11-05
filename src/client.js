@@ -80,8 +80,16 @@ window.__ModuleLoader__.load({
 .gw-tree-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   font-size:11.5px; }
 .gw-tree-dir:hover { background:var(--dsw-alias-interactive-bg-hover); }
-.gw-caret { width:12px; flex:none; display:inline-block; text-align:center;
-  font-size:11px; line-height:1; opacity:.7; }
+.gw-caret { width:12px; flex:none; color:var(--dsw-alias-label-tertiary); opacity:.9;
+  transition:transform .12s ease; }
+.gw-caret-open { transform:rotate(90deg); }
+.gw-files-tab { display:flex; flex-direction:column; height:100%; min-height:0; overflow:auto; }
+.gw-files-tab-head { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-files-tab-head:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.gw-files-tab-path { font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gw-files-tab-count { font-size:10.5px; color:var(--dsw-alias-label-tertiary);
+  font-family:var(--ds-font-family-code, ui-monospace, monospace); }
 .gw-count { color:var(--dsw-alias-label-tertiary); }
 .gw-group-actions { margin-left:auto; display:flex; gap:4px; }
 
@@ -381,6 +389,8 @@ window.__ModuleLoader__.load({
         amendLast: '修补上一次提交',
         undoLastCommit: '撤销上一次提交',
         changesGroup: '更改',
+        filesTabTitle: '差异',
+        openAllDiffs: '打开全部差异',
         stageAllChanges: '暂存全部更改',
         unstageAllChanges: '取消暂存全部',
         discardAllChanges: '撤销所有更改',
@@ -513,6 +523,8 @@ window.__ModuleLoader__.load({
         amendLast: 'Amend last commit',
         undoLastCommit: 'Undo last commit',
         changesGroup: 'Changes',
+        filesTabTitle: 'Diffs',
+        openAllDiffs: 'Open all diffs',
         stageAllChanges: 'Stage all changes',
         unstageAllChanges: 'Unstage all changes',
         discardAllChanges: 'Discard all changes',
@@ -1214,7 +1226,7 @@ window.__ModuleLoader__.load({
           style: pad,
           onClick: () => props.onToggleDir(node.path),
         },
-          E('span', { className: 'gw-caret' }, open ? '▾' : '▸'),
+          E(Caret, { open: open }),
           E('svg', {
             className: 'gw-dir-icon', width: 13, height: 13, viewBox: '0 0 16 16',
             fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinejoin: 'round',
@@ -1244,7 +1256,7 @@ window.__ModuleLoader__.load({
       const items = props.items
       return E('div', null,
         E('div', { className: 'gw-group-head', onClick: props.onToggle },
-          E('span', { className: 'gw-caret' }, props.open ? '▾' : '▸'),
+          E(Caret, { open: props.open === true }),
           E('span', { className: 'gw-group-title' }, props.title),
           E('span', { className: 'gw-spacer' }),
           E('span', { className: 'gw-group-actions' },
@@ -1314,6 +1326,21 @@ window.__ModuleLoader__.load({
           E('span', null, relativeTime(entry.time, t)),
           E('span', { className: 'gw-row-sep' }, '·'),
           E('span', null, entry.short)))
+    }
+
+    /** 只要逐行着色那一段，供批量标签页复用。 */
+    function DiffBody(props) {
+      const rows = useMemo(() => splitDiff(props.text === undefined ? '' : props.text), [props.text])
+      if (rows.length === 0) return E('div', { className: 'gw-empty' }, '—')
+      return E('div', { className: 'gw-diff-body' },
+        rows.map((row, index) => E('div', {
+          key: 'd' + String(index),
+          className: 'gw-diff-line' + (row.type === 'add' ? ' gw-diff-add'
+            : row.type === 'del' ? ' gw-diff-del'
+              : row.type === 'hunk' ? ' gw-diff-hunk' : ''),
+        },
+          E('span', { className: 'gw-diff-gutter' }, row.no === undefined ? '' : row.no),
+          E('span', { className: 'gw-diff-text' }, row.text))))
     }
 
     function DiffPane(props) {
@@ -1810,21 +1837,44 @@ window.__ModuleLoader__.load({
       }, [cwd, run, refreshSummary])
 
       /** 每组标题上的批量动作，悬停才出现；冲突组没有批量操作。 */
+      /* 一个分组的所有文件放进同一个差异标签页，省得一个一个点。 */
+      const openGroupDiff = useCallback((group, items) => {
+        const paths = items.map((item) => item.path)
+        if (paths.length === 0) return
+        const service = ctx === undefined || ctx === null ? undefined : ctx.get('betterSidebar')
+        if (service === undefined || service === null || typeof service.openTab !== 'function') return
+        try {
+          service.openTab({
+            type: 'git-workbench-files',
+            id: 'files:' + group,
+            title: t('filesTabTitle') + ' · ' + String(paths.length),
+            meta: { cwd: cwd, paths: paths, staged: group === 'staged' },
+          }, scope)
+        } catch (failure) {
+          void failure
+        }
+      }, [ctx, scope, cwd, t])
+
       const groupActions = useCallback((group, items) => {
         const paths = items.map((item) => item.path)
+        const openAll = E(ActionIcon, { name: 'openAll', title: t('openAllDiffs'), onClick: () => openGroupDiff(group, items) })
         if (group === 'staged') {
-          return E(ActionIcon, { name: 'unstage', title: t('unstageAll'), onClick: () => doUnstageAll(paths) })
+          return E('span', { style: { display: 'flex', gap: '1px' } },
+            openAll,
+            E(ActionIcon, { name: 'unstage', title: t('unstageAll'), onClick: () => doUnstageAll(paths) }))
         }
         if (group === 'unstaged') {
           return E('span', { style: { display: 'flex', gap: '1px' } },
+            openAll,
             E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
             E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
         }
         return E('span', { style: { display: 'flex', gap: '1px' } },
+          openAll,
           E(ActionIcon, { name: 'ignore', title: t('ignoreAll'), onClick: () => doIgnore(paths) }),
           E(ActionIcon, { name: 'discard', title: t('discardAllChanges'), onClick: () => doDiscardAll(items) }),
           E(ActionIcon, { name: 'stage', title: t('stageAll'), onClick: () => doStageAll(paths) }))
-      }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore])
+      }, [t, doUnstageAll, doStageAll, doDiscardAll, doIgnore, openGroupDiff])
 
       /* 错误提示自己退场：动画四秒，状态跟着清掉，免得下次误以为没消失。 */
       useEffect(() => {
@@ -2488,6 +2538,8 @@ window.__ModuleLoader__.load({
       // 撤销：一个从右下折回左上的回转箭头，与 VSCode 的那个同形。
       discard: ['M4 4.4H9.4a4.3 4.3 0 0 1 0 8.6H5.6', 'M7.6 10.8 5.4 13 7.6 15.2'],
       ignore: ['M8 2.4a5.6 5.6 0 1 0 0 11.2A5.6 5.6 0 0 0 8 2.4z', 'M4.2 11.8 11.8 4.2'],
+      // 打开全部差异：两张叠起来的纸。
+      openAll: ['M5.8 1.8h4.6L13 4.4v7.6a1.1 1.1 0 0 1-1.1 1.1H5.8a1.1 1.1 0 0 1-1.1-1.1V2.9a1.1 1.1 0 0 1 1.1-1.1z', 'M9.6 1.9v2.6h2.6', 'M3 4.6v8.6a1.1 1.1 0 0 0 1.1 1.1h6.5'],
     }
 
     function ActionIcon(props) {
@@ -2502,6 +2554,67 @@ window.__ModuleLoader__.load({
           strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round',
         },
           paths.map((d, index) => E('path', { key: 'p' + String(index), d: d }))))
+    }
+
+    /**
+     * 批量差异标签页：一个分组下所有文件并排展开，点标题折叠。
+     * 侧边栏自带的 diff 标签只认单个文件或整次提交，这一组得自己画。
+     */
+    function FilesTab(props) {
+      const t = props.t
+      const ctx = props.ctx
+      const scope = props.scope
+      const tab = props.tab
+      const meta = tab === undefined || tab === null || tab.meta === undefined || tab.meta === null ? {} : tab.meta
+      const cwd = typeof meta.cwd === 'string' ? meta.cwd : (ctx === undefined || ctx === null ? '' : sessionCwdOf(ctx, scope === undefined ? undefined : scope.sessionId))
+      const paths = Array.isArray(meta.paths) ? meta.paths : []
+      const staged = meta.staged === true
+      const [state, setState] = useState({ loading: true, items: [], error: null })
+      const [open, setOpen] = useState({})
+      const alive = useRef(true)
+
+      useEffect(() => {
+        alive.current = true
+        void (async () => {
+          try {
+            const loaded = []
+            for (const item of paths) {
+              try {
+                const data = await api('fileDiff', { cwd: cwd, path: item, staged: staged })
+                loaded.push({ path: item, text: typeof data.text === 'string' ? data.text : '' })
+              } catch (failure) {
+                loaded.push({ path: item, text: String(failure.message), failed: true })
+              }
+            }
+            if (alive.current) setState({ loading: false, items: loaded, error: null })
+          } catch (failure) {
+            if (alive.current) setState({ loading: false, items: [], error: String(failure.message) })
+          }
+        })()
+        return () => { alive.current = false }
+      }, [cwd, staged])
+
+      if (state.loading === true) return E('div', { className: 'gw-pad' }, t('loading'))
+      if (state.error !== null) return E('div', { className: 'gw-pad' }, state.error)
+
+      return E('div', { className: 'gw-files-tab' },
+        state.items.map((item, index) => {
+          const openNow = open[item.path] !== false
+          const rows = splitDiff(item.text === undefined ? '' : item.text)
+          const added = rows.filter((line) => line.type === 'add').length
+          const removed = rows.filter((line) => line.type === 'del').length
+          return E('div', { key: 'f' + String(index), className: 'gw-files-tab-item' },
+            E('div', {
+              className: 'gw-files-tab-head',
+              onClick: () => setOpen(Object.assign({}, open, { [item.path]: openNow === false })),
+            },
+              E(Caret, { open: openNow }),
+              E('span', { className: 'gw-files-tab-path' }, item.path),
+              E('span', { className: 'gw-spacer' }),
+              E('span', { className: 'gw-files-tab-count' },
+                item.failed === true ? t('diffLoadError') : '+' + String(added) + ' −' + String(removed))),
+            openNow === false ? null : E(DiffBody, { text: item.text }))
+        }))
     }
 
     /** 图头那一排小图标按钮：统一 22px 热区、14px 图形，忙时换成省略号。 */
@@ -2525,6 +2638,18 @@ window.__ModuleLoader__.load({
         disabled: props.disabled === true,
         onClick: props.onClick,
       }, children)
+    }
+
+    /** 折叠箭头：与 diff 视图里那个一致，展开时转 90 度。 */
+    function Caret(props) {
+      return E('span', {
+        className: 'gw-caret' + (props.open === true ? ' gw-caret-open' : ''),
+        style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+      }, E('svg', {
+        width: 12, height: 12, viewBox: '0 0 16 16',
+        fill: 'none', stroke: 'currentColor', strokeWidth: 1.6,
+        strokeLinecap: 'round', strokeLinejoin: 'round',
+      }, E('path', { d: 'M6 3.5 10.5 8 6 12.5' })))
     }
 
     function TabIcon(props) {
@@ -2556,7 +2681,25 @@ window.__ModuleLoader__.load({
             single: true,
             component: (tabProps) => E(GitPanel, tabProps),
           })
-          return () => { if (typeof off === 'function') off() }
+          /* 批量差异标签：一个分组下所有文件放一起看，从分组标题打开，
+             所以不出现在新建标签的菜单里，也可以同时开好几个。 */
+          const offFiles = betterSidebar.registerTab({
+            id: 'git-workbench-files',
+            title: () => t('filesTabTitle'),
+            hidden: true,
+            single: false,
+            dedupeKey: (tab) => (tab === undefined || tab === null ? undefined : tab.id),
+            component: (tabProps) => E(FilesTab, {
+              t: t,
+              ctx: tabProps.ctx,
+              scope: tabProps.scope,
+              tab: tabProps.tab,
+            }),
+          })
+          return () => {
+            if (typeof off === 'function') off()
+            if (typeof offFiles === 'function') offFiles()
+          }
         }, 'dsh-git-workbench: sidebar tab')
       })
     }
