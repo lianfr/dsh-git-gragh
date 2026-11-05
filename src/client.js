@@ -168,21 +168,27 @@ const OUTPUT_KINDS = ['all', 'git', 'repository']
 .gw-output-fail .gw-output-note { color:var(--dsw-alias-state-error-primary); }
 /* 设置面板：一行一项，名字与说明在左，控件在右，行间一条细线。 */
 .gw-set-list { display:flex; flex-direction:column; }
-.gw-set-item { display:flex; align-items:center; gap:16px; padding:11px 0;
+/* 每行：左边标题加说明，右边控件，底部一条极淡的分隔线。 */
+.gw-set-item { display:flex; align-items:center; gap:20px; padding:18px 0;
   border-bottom:1px solid var(--dsw-alias-border-l1); }
 .gw-set-item:last-child { border-bottom:none; }
-.gw-set-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
-.gw-set-name { font-size:13px; color:var(--dsw-alias-label-primary); }
-.gw-set-desc { font-size:12px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
-.gw-switch { position:relative; flex:none; width:34px; height:20px; padding:0; border:none;
-  border-radius:10px; cursor:pointer; transition:background .15s ease;
+.gw-set-text { display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 auto; }
+.gw-set-name { font-size:15px; font-weight:500; line-height:1.3; color:var(--dsw-alias-label-primary); }
+.gw-set-desc { font-size:13px; line-height:1.5; color:var(--dsw-alias-label-tertiary); }
+/* 设置行里的下拉是浅灰圆角块，跟宿主设置页右侧控件同形 */
+.gw-set-item .gw-dd-btn { height:32px; min-width:118px; padding:0 12px; border:none;
+  border-radius:10px; font-size:13px; color:var(--dsw-alias-label-primary);
+  background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent); }
+.gw-set-item .gw-dd-btn:hover { background:color-mix(in srgb, var(--dsw-alias-label-primary) 13%, transparent); }
+/* 开关：深色实心轨道，白点撑满高度 */
+.gw-switch { position:relative; flex:none; width:40px; height:24px; padding:0; border:none;
+  border-radius:12px; cursor:pointer; transition:background .15s ease;
   background:var(--dsw-alias-interactive-bg-active);
   background:color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent); }
-/* 开启态是实心深色轨道，白点几乎撑满，圆角跟着轨道走 */
 .gw-switch-on { background:var(--dsw-alias-label-primary); }
-.gw-switch-knob { position:absolute; top:1.5px; left:1.5px; width:17px; height:17px; border-radius:8.5px;
+.gw-switch-knob { position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:10px;
   background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.28); transition:transform .15s ease; }
-.gw-switch-on .gw-switch-knob { transform:translateX(14px); }
+.gw-switch-on .gw-switch-knob { transform:translateX(16px); }
 .gw-set-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
 .gw-set-label { flex:0 0 84px; font-size:11px; color:var(--dsw-alias-label-secondary); }
 .gw-set-opts { display:flex; gap:4px; }
