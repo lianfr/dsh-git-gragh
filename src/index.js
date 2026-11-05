@@ -15,7 +15,7 @@
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { GitError, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
+import { GitError, gitExecutable, gitText, gitTextQuiet, messageOf, recentGit, runGit } from './git-run.js'
 import { LOG_FIELD, LOG_RECORD, parseBranch, parseLog, parseNumstat, parseStatus } from './git-parse.js'
 
 export const name = 'dsh-git-workbench'
@@ -582,7 +582,7 @@ async function push(payload) {
 /** 面板里的「显示 Git 输出」：把最近执行过的命令原样倒出来。 */
 function gitRecords(payload) {
   const limit = boundedNumber(payload.limit, 200, 1, 300)
-  return { records: recentGit(limit) }
+  return { records: recentGit(limit), executable: gitExecutable() }
 }
 
 const READ_METHODS = { summary, log, branches, commitDetail, fileDiff, remotes, gitRecords }

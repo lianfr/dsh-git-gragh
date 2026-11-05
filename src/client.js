@@ -8,6 +8,9 @@ window.__ModuleLoader__.load({
     const PKG = 'dsh-git-workbench'
     const API_BASE = PKG + '/api'
     const PAGE_SIZE = 100
+/* Git 输出页的筛选档位，与 VSCode 的日志级别对齐。 */
+const POLL_LEVELS = ['all', 'error', 'warning', 'info', 'debug', 'trace']
+const OUTPUT_KINDS = ['all', 'git', 'repository']
     const UNCOMMITTED_HASH = '@uncommitted'
   const POLL_MS = 3000
 
@@ -116,6 +119,19 @@ window.__ModuleLoader__.load({
   transition:transform .12s ease; }
 .gw-caret-open { transform:rotate(90deg); }
 .gw-card-wide { max-width:560px; }
+.gw-output-bar { display:flex; align-items:center; gap:6px; padding:4px 10px; flex:none;
+  border-bottom:1px solid var(--dsw-alias-border-l1); }
+.gw-output-exe { font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size:10.5px; color:var(--dsw-alias-label-tertiary); overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; max-width:45%; }
+.gw-output-pick { height:22px; box-sizing:border-box; padding:0 4px; border-radius:var(--dsw-radius-xs, 4px);
+  border:1px solid var(--dsw-alias-border-l2); background:transparent; color:var(--dsw-alias-label-secondary);
+  font-size:11px; outline:none; }
+.gw-output-search { height:22px; width:120px; box-sizing:border-box; padding:0 6px;
+  border-radius:var(--dsw-radius-xs, 4px); border:1px solid var(--dsw-alias-border-l2);
+  background:transparent; color:var(--dsw-alias-label-primary); font-size:11px; outline:none; }
+.gw-output-search::placeholder { color:var(--dsw-alias-label-tertiary); }
+.gw-output-quiet .gw-output-cmd { color:var(--dsw-alias-label-secondary); }
 .gw-output-scroll { flex:1 1 auto; min-height:0; overflow:auto; padding:8px 14px 16px; }
 .gw-output { display:flex; flex-direction:column;
   font-family:var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -488,6 +504,9 @@ window.__ModuleLoader__.load({
         openAllDiffs: '打开全部差异',
         filesUnit: '个文件',
         unmodifiedLines: '行未改动',
+    allLevels: '全部级别',
+    allKinds: '全部类别',
+    searchOutput: '搜索命令或输出',
         stageAllChanges: '暂存全部更改',
         unstageAllChanges: '取消暂存全部',
         discardAllChanges: '撤销所有更改',
@@ -631,6 +650,9 @@ window.__ModuleLoader__.load({
         openAllDiffs: 'Open all diffs',
         filesUnit: 'files',
         unmodifiedLines: 'unmodified lines',
+    allLevels: 'All levels',
+    allKinds: 'All kinds',
+    searchOutput: 'Search command or output',
         stageAllChanges: 'Stage all changes',
         unstageAllChanges: 'Unstage all changes',
         discardAllChanges: 'Discard all changes',
@@ -1278,6 +1300,35 @@ window.__ModuleLoader__.load({
         const pad = (value) => (value < 10 ? '0' + String(value) : String(value))
         return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds())
       }
+      const [level, setLevel] = useState('all')
+      const [kind, setKind] = useState('all')
+      const [query, setQuery] = useState('')
+      /* 筛选留在这里而不是父层：它只关心这一屏的记录，没必要污染上面那堆状态。 */
+      const visible = useMemo(() => {
+        const needle = query.trim()
+        let pattern = null
+        if (needle !== '') {
+          try {
+            pattern = new RegExp(needle, 'i')
+          } catch (failure) {
+            void failure
+            pattern = null
+          }
+        }
+        return props.records.filter((item) => {
+          if (level !== 'all' && item.level !== level) return false
+          if (kind !== 'all' && item.category !== kind) return false
+          if (needle === '') return true
+          const hay = String(item.command) + ' ' + String(item.message === undefined ? '' : item.message) + ' ' + String(item.stderr === undefined ? '' : item.stderr)
+          if (pattern !== null) return pattern.test(hay)
+          return hay.toLowerCase().indexOf(needle.toLowerCase()) >= 0
+        })
+      }, [props.records, level, kind, query])
+      const pick = (values, current, onPick, labelOf) => E('select', {
+        className: 'gw-output-pick',
+        value: current,
+        onChange: (event) => onPick(event.target.value),
+      }, values.map((value) => E('option', { key: value, value: value }, labelOf(value))))
       return E('div', { className: 'gw-diff' },
         E('div', { className: 'gw-diff-head' },
           E('button', { className: 'gw-btn gw-btn-ghost gw-btn-sm', onClick: props.onBack }, '\u2190 ' + t('back')),
@@ -1288,11 +1339,27 @@ window.__ModuleLoader__.load({
               width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none',
               stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
             }, E('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7M13 2.4V5.4H10' })))),
-        props.records.length === 0
+        E('div', { className: 'gw-output-bar' },
+          E('span', {
+            className: 'gw-output-exe',
+            title: props.executable === undefined ? 'git' : props.executable,
+          }, 'git: ' + String(props.executable === undefined ? 'git' : props.executable)),
+          E('span', { className: 'gw-spacer' }),
+          pick(POLL_LEVELS, level, setLevel, (value) => (value === 'all' ? t('allLevels') : value)),
+          pick(OUTPUT_KINDS, kind, setKind, (value) => (value === 'all' ? t('allKinds') : value)),
+          E('input', {
+            className: 'gw-output-search',
+            value: query,
+            placeholder: t('searchOutput'),
+            onChange: (event) => setQuery(event.target.value),
+          })),
+        visible.length === 0
           ? E('div', { className: 'gw-empty' }, t('outputEmpty'))
-          : E('div', { className: 'gw-output-scroll' }, E('div', { className: 'gw-output' }, props.records.map((item, index) => E('div', {
+          : E('div', { className: 'gw-output-scroll' }, E('div', { className: 'gw-output' }, visible.map((item, index) => E('div', {
             key: 'o' + String(index),
-            className: 'gw-output-item' + (item.failed === true ? ' gw-output-fail' : ''),
+            className: 'gw-output-item'
+              + (item.failed === true ? ' gw-output-fail' : '')
+              + (item.level === 'debug' ? ' gw-output-quiet' : ''),
           },
             E('div', { className: 'gw-output-meta' },
               E('div', { className: 'gw-output-time' }, at(item.at)),
@@ -1870,6 +1937,7 @@ window.__ModuleLoader__.load({
       const [settingsOpen, setSettingsOpen] = useState(false)
       const [outputOpen, setOutputOpen] = useState(false)
       const [outputList, setOutputList] = useState([])
+      const [outputExe, setOutputExe] = useState('')
       const [collapsedDirs, setCollapsedDirs] = useState(() => [])
       const [detail, setDetail] = useState(null)
       const [diffView, setDiffView] = useState(null)
@@ -2671,11 +2739,14 @@ window.__ModuleLoader__.load({
         ? E(OutputPane, {
             t: t,
             records: outputList,
+            executable: outputExe,
             onBack: () => setOutputOpen(false),
             onRefresh: () => {
               void run(async () => {
                 const data = await api('gitRecords', { limit: 200 })
-                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+                if (aliveRef.current === false) return
+                setOutputList(Array.isArray(data.records) ? data.records : [])
+                setOutputExe(typeof data.executable === 'string' ? data.executable : '')
               })
             },
           })
@@ -2853,7 +2924,9 @@ window.__ModuleLoader__.load({
               setOutputOpen(true)
               void run(async () => {
                 const data = await api('gitRecords', { limit: 200 })
-                if (aliveRef.current) setOutputList(Array.isArray(data.records) ? data.records : [])
+                if (aliveRef.current === false) return
+                setOutputList(Array.isArray(data.records) ? data.records : [])
+                setOutputExe(typeof data.executable === 'string' ? data.executable : '')
               })
             }))),
         settingsOpen === false ? null : E(SettingsDialog, {
